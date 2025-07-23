@@ -233,11 +233,57 @@ if [ "$INSTALL_STATE" = "stage2" ]; then
             DRIVER_FILE=$(ls NVIDIA-Linux-x86_64-*.run | head -1)
             echo -e "${GREEN}Found driver installer: $DRIVER_FILE${NC}"
             
+            # Check if Secure Boot is enabled
+            if mokutil --sb-state 2>/dev/null | grep -q "SecureBoot enabled"; then
+                echo -e "${YELLOW}Secure Boot is enabled!${NC}"
+                echo ""
+                echo "Options:"
+                echo "1. Use signed driver (recommended)"
+                echo "2. Use Ubuntu's pre-signed driver"
+                echo "3. Install unsigned (will fail with Secure Boot)"
+                echo ""
+                read -p "Choose option (1-3): " -n 1 -r
+                echo
+                
+                case $REPLY in
+                    1)
+                        echo -e "${GREEN}Using signed driver installation...${NC}"
+                        echo "Run: ${GREEN}sudo ./scripts/sign-nvidia-driver.sh${NC}"
+                        echo ""
+                        echo "This will:"
+                        echo "- Create MOK signing keys"
+                        echo "- Require a reboot to enroll keys"
+                        echo "- Install signed driver after enrollment"
+                        exit 0
+                        ;;
+                    2)
+                        echo -e "${GREEN}Using Ubuntu's pre-signed driver...${NC}"
+                        echo "Run: ${GREEN}./scripts/install-ubuntu-nvidia-driver.sh${NC}"
+                        exit 0
+                        ;;
+                    3)
+                        echo -e "${YELLOW}Warning: This will likely fail with Secure Boot enabled${NC}"
+                        ;;
+                esac
+            fi
+            
             read -p "Install NVIDIA driver now? (Y/n): " -n 1 -r
             echo
             if [[ ! $REPLY =~ ^[Nn]$ ]]; then
                 echo "Installing NVIDIA driver..."
                 $SUDO ./$DRIVER_FILE --silent --dkms
+                
+                if [ $? -ne 0 ]; then
+                    echo -e "${RED}Driver installation failed!${NC}"
+                    echo ""
+                    if mokutil --sb-state 2>/dev/null | grep -q "SecureBoot enabled"; then
+                        echo "This is likely due to Secure Boot. Try:"
+                        echo "1. ${GREEN}sudo ./scripts/sign-nvidia-driver.sh${NC} (recommended)"
+                        echo "2. ${GREEN}./scripts/install-ubuntu-nvidia-driver.sh${NC}"
+                        echo "3. Disable Secure Boot in BIOS"
+                    fi
+                    exit 1
+                fi
                 
                 save_state "stage3_reboot_required"
                 

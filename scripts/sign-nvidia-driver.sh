@@ -40,24 +40,38 @@ if ! command -v mokutil &> /dev/null; then
 fi
 
 # Check if key is already enrolled
-if mokutil --test-key MOK.der 2>&1 | grep -q "is already enrolled"; then
-    echo -e "${GREEN}✓ MOK key already enrolled${NC}"
-else
+if [ -f MOK.der ]; then
+    if mokutil --test-key MOK.der 2>&1 | grep -q "is already enrolled"; then
+        echo -e "${GREEN}✓ MOK key already enrolled${NC}"
+        MOK_ENROLLED=1
+    else
+        echo -e "${YELLOW}MOK key exists but not enrolled yet${NC}"
+    fi
+fi
+
+# Import key if not enrolled
+if [ -z "$MOK_ENROLLED" ]; then
     echo -e "\n${YELLOW}Enrolling MOK key...${NC}"
-    echo "You'll need to create a password for MOK enrollment."
+    echo -e "${RED}IMPORTANT: You must create a password for MOK enrollment${NC}"
     echo "Remember this password - you'll need it after reboot!"
     echo ""
     
     mokutil --import MOK.der
     
-    echo -e "\n${RED}IMPORTANT: After reboot, you'll see a blue MOK management screen${NC}"
+    echo -e "\n${RED}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo -e "${RED}STOP! You must reboot and enroll the MOK key first!${NC}"
+    echo -e "${RED}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo ""
+    echo "After reboot, you'll see a blue MOK management screen:"
     echo "1. Select 'Enroll MOK'"
     echo "2. Select 'Continue'"
     echo "3. Select 'Yes'"
     echo "4. Enter the password you just created"
     echo "5. Select 'Reboot'"
-    
-    NEEDS_REBOOT=1
+    echo ""
+    echo -e "${YELLOW}After MOK enrollment, run this script again to install the driver${NC}"
+    echo ""
+    exit 0
 fi
 
 # Find NVIDIA driver installer
