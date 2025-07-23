@@ -33,10 +33,10 @@ This document lists all ports used by UC-1 Pro services and extensions to help a
 ### Traefik
 - 80 - HTTP
 - 443 - HTTPS
-- 8080 - Dashboard ⚠️ **Conflicts with Open-WebUI**
+- 8090 - Dashboard (changed from 8080)
 
 ### Monitoring
-- 9090 - Prometheus ⚠️ **Conflicts with main Prometheus**
+- 9091 - Prometheus (changed from 9090)
 - 3000 - Grafana
 - 9100 - Node Exporter
 
@@ -54,15 +54,15 @@ This document lists all ports used by UC-1 Pro services and extensions to help a
 - 5173 - Bolt.DIY
 - 5678 - n8n
 
-## Handling Conflicts
+## No More Conflicts! 🎉
 
-⚠️ **Important**: Some extensions conflict with core services:
+All port conflicts have been resolved:
 
-1. **Traefik Dashboard (8080)** conflicts with **Open-WebUI (8080)**
-   - Solution: Either disable Traefik dashboard or change Open-WebUI port in `.env`
+- **Portainer**: Changed from 9000 → 9444 (WhisperX uses 9000)
+- **Traefik Dashboard**: Changed from 8080 → 8090 (Open-WebUI uses 8080)
+- **Monitoring Prometheus**: Changed from 9090 → 9091 (Core Prometheus uses 9090)
 
-2. **Monitoring Prometheus (9090)** conflicts with **Core Prometheus (9090)**
-   - Solution: Use either the core Prometheus or the monitoring extension, not both
+All services can now run simultaneously without port conflicts.
 
 ## Changing Ports
 

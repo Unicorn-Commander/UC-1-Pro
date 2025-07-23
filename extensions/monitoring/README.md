@@ -18,7 +18,7 @@ docker-compose up -d
 ```
 
 Access:
-- Prometheus: http://localhost:9090
+- Prometheus: http://localhost:9091
 - Grafana: http://localhost:3000 (admin/admin by default)
 
 ## Configuration
@@ -137,7 +137,7 @@ docker run --rm -v uc1-pro_prometheus_data:/data -v $(pwd):/backup alpine tar cz
 ### Clean Old Data
 ```bash
 # Access Prometheus admin API
-curl -X POST http://localhost:9090/api/v1/admin/tsdb/clean_tombstones
+curl -X POST http://localhost:9091/api/v1/admin/tsdb/clean_tombstones
 ```
 
 ## Troubleshooting

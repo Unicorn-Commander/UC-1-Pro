@@ -26,7 +26,7 @@ This setup provides a basic Traefik instance that can be used to route traffic t
 
 3.  **Access the Dashboard**:
 
-    Once Traefik is running, you can access its dashboard at `http://localhost:8080`.
+    Once Traefik is running, you can access its dashboard at `http://localhost:8090`.
 
     *Note: The dashboard is currently configured with a basic authentication (user: `test`, password: `test`). You should change this in `docker-compose.yml` for production use.*
 
