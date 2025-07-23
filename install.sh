@@ -335,14 +335,21 @@ if [ "$INSTALL_STATE" = "stage3" ]; then
         SEARXNG_SECRET=$(generate_password 32)
         COMFYUI_KEY=$(generate_api_key "comfy")
         GRAFANA_PASS=$(generate_password 16)
+        PGADMIN_PASS=$(generate_password 16)
+        CODE_SERVER_PASS=$(generate_password 20)
+        JUPYTER_TOKEN=$(generate_password 32)
         
         # Replace default values with generated ones
-        sed -i.bak "s/POSTGRES_PASSWORD=.*/POSTGRES_PASSWORD=${POSTGRES_PASS}/" .env
-        sed -i.bak "s/WEBUI_SECRET_KEY=.*/WEBUI_SECRET_KEY=${WEBUI_SECRET}/" .env
-        sed -i.bak "s/VLLM_API_KEY=.*/VLLM_API_KEY=${VLLM_KEY}/" .env
-        sed -i.bak "s/SEARXNG_SECRET=.*/SEARXNG_SECRET=${SEARXNG_SECRET}/" .env
-        sed -i.bak "s/COMFYUI_API_KEY=.*/COMFYUI_API_KEY=${COMFYUI_KEY}/" .env
-        sed -i.bak "s/GRAFANA_PASSWORD=.*/GRAFANA_PASSWORD=${GRAFANA_PASS}/" .env
+        # Use | as delimiter to avoid issues with special characters
+        sed -i.bak "s|POSTGRES_PASSWORD=.*|POSTGRES_PASSWORD=${POSTGRES_PASS}|" .env
+        sed -i.bak "s|WEBUI_SECRET_KEY=.*|WEBUI_SECRET_KEY=${WEBUI_SECRET}|" .env
+        sed -i.bak "s|VLLM_API_KEY=.*|VLLM_API_KEY=${VLLM_KEY}|" .env
+        sed -i.bak "s|SEARXNG_SECRET=.*|SEARXNG_SECRET=${SEARXNG_SECRET}|" .env
+        sed -i.bak "s|COMFYUI_API_KEY=.*|COMFYUI_API_KEY=${COMFYUI_KEY}|" .env
+        sed -i.bak "s|GRAFANA_PASSWORD=.*|GRAFANA_PASSWORD=${GRAFANA_PASS}|" .env
+        sed -i.bak "s|PGADMIN_PASSWORD=.*|PGADMIN_PASSWORD=${PGADMIN_PASS}|" .env
+        sed -i.bak "s|CODE_SERVER_PASSWORD=.*|CODE_SERVER_PASSWORD=${CODE_SERVER_PASS}|" .env
+        sed -i.bak "s|JUPYTER_TOKEN=.*|JUPYTER_TOKEN=${JUPYTER_TOKEN}|" .env
         
         # Clean up backup files
         rm -f .env.bak
@@ -350,11 +357,12 @@ if [ "$INSTALL_STATE" = "stage3" ]; then
         echo -e "${GREEN}✓ Secure passwords generated and saved to .env${NC}"
         echo ""
         echo "Generated credentials (save these!):"
-        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
         echo "PostgreSQL Password: ${POSTGRES_PASS}"
         echo "vLLM API Key: ${VLLM_KEY}"
-        echo "Grafana Password: admin / ${GRAFANA_PASS}"
-        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        echo "Grafana: admin / ${GRAFANA_PASS}"
+        echo "pgAdmin: admin@uc1.local / ${PGADMIN_PASS}"
+        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
         echo ""
         
         # Optionally let user review/edit
