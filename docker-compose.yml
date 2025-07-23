@@ -363,6 +363,11 @@ services:
     environment:
       VLLM_URL: "http://unicorn-vllm:8000"
       VLLM_API_KEY: "${VLLM_API_KEY:-dummy-key}"
+      HF_TOKEN: "${HF_TOKEN:-}"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./volumes/vllm_models:/models
+      - /usr/local/bin/docker:/usr/local/bin/docker:ro
     networks:
       unicorn-network:
         aliases:

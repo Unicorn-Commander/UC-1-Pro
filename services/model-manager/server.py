@@ -6,11 +6,27 @@ import os
 from typing import List, Dict, Optional
 import asyncio
 import time
+import json
+import subprocess
+from datetime import datetime, timedelta
+from huggingface_hub import HfApi, list_models
+import docker
+import psutil
 
 app = FastAPI(title="UC-1 Pro Model Manager")
 
 VLLM_URL = os.environ.get("VLLM_URL", "http://unicorn-vllm:8000")
 VLLM_API_KEY = os.environ.get("VLLM_API_KEY", "dummy-key")
+MODEL_DIR = "/models"
+IDLE_TIMEOUT = 300  # 5 minutes in seconds
+
+# Track last activity
+last_activity = datetime.now()
+idle_model = "microsoft/DialoGPT-small"  # Lightweight fallback model
+
+# Initialize Hugging Face API
+hf_api = HfApi()
+docker_client = docker.from_env()
 
 # Available models configuration
 AVAILABLE_MODELS = [
@@ -43,9 +59,16 @@ AVAILABLE_MODELS = [
 class ModelSwitch(BaseModel):
     model_id: str
     quantization: str = "awq"
+    auto_download: bool = True
     
     class Config:
         protected_namespaces = ()  # Disable protected namespace warning
+
+class ModelSearch(BaseModel):
+    query: str
+    filter_awq: bool = True
+    filter_size: str = "medium"  # small, medium, large
+    limit: int = 20
 
 @app.get("/")
 async def root():
@@ -79,6 +102,15 @@ async def root():
                 <h3>Current Status</h3>
                 <div id="status">Loading...</div>
             </div>
+            
+            <h3>Search & Download Models</h3>
+            <div style="margin: 20px 0;">
+                <input type="text" id="searchQuery" placeholder="Search models (e.g., 'Qwen', 'Llama')" style="width: 300px; padding: 8px;">
+                <label><input type="checkbox" id="filterAWQ" checked> AWQ Only</label>
+                <button onclick="searchModels()" style="margin-left: 10px;">Search</button>
+            </div>
+            <div id="searchResults"></div>
+            
             <h3>Available Models</h3>
             <div id="models"></div>
         </div>
@@ -107,7 +139,15 @@ async def root():
                             statusHtml += `• Tokens/sec: ${perfData.tokens_per_second.toFixed(1)}<br>`;
                             statusHtml += `• Active requests: ${perfData.active_requests}<br>`;
                             statusHtml += `• GPU cache usage: ${perfData.gpu_cache_usage.toFixed(1)}%<br>`;
-                            statusHtml += `• Total tokens: ${perfData.total_tokens_generated.toLocaleString()}`;
+                            statusHtml += `• Total tokens: ${perfData.total_tokens_generated.toLocaleString()}<br>`;
+                            
+                            if (perfData.idle_timeout_remaining > 0) {
+                                const minutes = Math.floor(perfData.idle_timeout_remaining / 60);
+                                const seconds = perfData.idle_timeout_remaining % 60;
+                                statusHtml += `• Idle swap in: ${minutes}m ${seconds}s`;
+                            } else if (perfData.active_requests === 0) {
+                                statusHtml += `• <span style="color: orange;">Will swap to lightweight model when idle</span>`;
+                            }
                         }
                     }
                     
@@ -129,10 +169,76 @@ async def root():
                         <button onclick="switchModel('${model.id}', '${model.quantization}')">
                             Load This Model
                         </button>
+                        <button onclick="deleteModel('${model.id}')" style="background: #f44336; margin-left: 10px;">
+                            Delete
+                        </button>
                     </div>
                 `).join('');
                 
                 document.getElementById('models').innerHTML = html;
+            }
+            
+            async function searchModels() {
+                const query = document.getElementById('searchQuery').value;
+                const filterAWQ = document.getElementById('filterAWQ').checked;
+                
+                const response = await fetch(`/api/search?query=${encodeURIComponent(query)}&filter_awq=${filterAWQ}&limit=20`);
+                const data = await response.json();
+                
+                if (data.error) {
+                    document.getElementById('searchResults').innerHTML = `<div class="error">${data.error}</div>`;
+                    return;
+                }
+                
+                const html = data.models.map(model => `
+                    <div class="model-card" style="border-left: 3px solid #2196f3;">
+                        <h4>${model.id}</h4>
+                        <p>Downloads: ${model.downloads.toLocaleString()} | Likes: ${model.likes} | Size: ${model.estimated_size}</p>
+                        <p><strong>Quantization:</strong> ${model.quantization}</p>
+                        <button onclick="downloadAndSwitch('${model.id}', '${model.quantization}')" style="background: #4caf50;">
+                            Download & Switch
+                        </button>
+                        <button onclick="downloadOnly('${model.id}')" style="background: #ff9800; margin-left: 10px;">
+                            Download Only
+                        </button>
+                    </div>
+                `).join('');
+                
+                document.getElementById('searchResults').innerHTML = html;
+            }
+            
+            async function downloadOnly(modelId) {
+                if (!confirm(`Download ${modelId}? This may take several minutes.`)) return;
+                
+                const response = await fetch('/api/download', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({model_id: modelId})
+                });
+                
+                const result = await response.json();
+                alert(result.message);
+            }
+            
+            async function downloadAndSwitch(modelId, quantization) {
+                if (!confirm(`Download and switch to ${modelId}?\\n\\nThis will:\\n1. Download the model (may take time)\\n2. Restart vLLM container\\n3. Load the new model`)) {
+                    return;
+                }
+                
+                const response = await fetch('/api/switch', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        model_id: modelId, 
+                        quantization: quantization,
+                        auto_download: true
+                    })
+                });
+                
+                const result = await response.json();
+                alert(result.message);
+                checkStatus();
+                loadModels();
             }
             
             async function switchModel(modelId, quantization) {
@@ -143,12 +249,28 @@ async def root():
                 const response = await fetch('/api/switch', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({model_id: modelId, quantization: quantization})
+                    body: JSON.stringify({
+                        model_id: modelId, 
+                        quantization: quantization,
+                        auto_download: false
+                    })
                 });
                 
                 const result = await response.json();
                 alert(result.message);
                 checkStatus();
+            }
+            
+            async function deleteModel(modelId) {
+                if (!confirm(`Delete ${modelId} from local storage?`)) return;
+                
+                const response = await fetch(`/api/models/${encodeURIComponent(modelId)}`, {
+                    method: 'DELETE'
+                });
+                
+                const result = await response.json();
+                alert(result.message);
+                loadModels();
             }
             
             // Initial load
@@ -211,24 +333,199 @@ async def get_status():
 
 @app.post("/api/switch")
 async def switch_model(request: ModelSwitch):
-    """Switch to a different model"""
-    return {
-        "status": "manual_action_required",
-        "message": f"To switch to {request.model_id}, run:\n\n" +
-                  f"docker-compose exec vllm pkill -f 'vllm.entrypoints.openai.api_server'\n" +
-                  f"Then update DEFAULT_LLM_MODEL in .env and run: docker-compose restart vllm",
-        "model": request.model_id,
-        "quantization": request.quantization
-    }
+    """Switch to a different model with automatic download"""
+    await update_activity()  # User is actively managing models
+    
+    result = await swap_model_internal(
+        request.model_id, 
+        request.quantization, 
+        request.auto_download
+    )
+    
+    return result
+
+@app.post("/api/download")
+async def download_model(model_id: str):
+    """Download a model without switching to it"""
+    try:
+        model_path = f"{MODEL_DIR}/{model_id}"
+        if os.path.exists(f"{model_path}/config.json"):
+            return {"status": "already_exists", "message": f"Model {model_id} already downloaded"}
+        
+        print(f"Downloading model: {model_id}")
+        result = subprocess.run([
+            "huggingface-cli", "download", model_id,
+            "--local-dir", model_path,
+            "--local-dir-use-symlinks", "False"
+        ], capture_output=True, text=True)
+        
+        if result.returncode == 0:
+            return {"status": "success", "message": f"Downloaded {model_id}"}
+        else:
+            return {"status": "error", "message": f"Download failed: {result.stderr}"}
+            
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+@app.delete("/api/models/{model_id:path}")
+async def delete_model(model_id: str):
+    """Delete a downloaded model to free space"""
+    try:
+        model_path = f"{MODEL_DIR}/{model_id}"
+        if os.path.exists(model_path):
+            import shutil
+            shutil.rmtree(model_path)
+            return {"status": "success", "message": f"Deleted {model_id}"}
+        else:
+            return {"status": "not_found", "message": f"Model {model_id} not found"}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
 
 @app.get("/health")
 async def health():
     """Health check endpoint"""
     return {"status": "healthy"}
 
+# Background task for idle monitoring
+@app.on_event("startup")
+async def startup_event():
+    """Start background tasks"""
+    asyncio.create_task(idle_monitor_task())
+
+async def idle_monitor_task():
+    """Background task to monitor for idle state"""
+    while True:
+        try:
+            await check_idle_and_swap()
+            await asyncio.sleep(60)  # Check every minute
+        except Exception as e:
+            print(f"Idle monitor error: {e}")
+            await asyncio.sleep(60)
+
+# Helper functions
+async def update_activity():
+    """Update last activity timestamp"""
+    global last_activity
+    last_activity = datetime.now()
+
+async def check_idle_and_swap():
+    """Check if system is idle and swap to lightweight model"""
+    global last_activity
+    if datetime.now() - last_activity > timedelta(seconds=IDLE_TIMEOUT):
+        current_status = await get_status()
+        if (current_status.get('ready') and 
+            current_status.get('current_model') != idle_model and
+            current_status.get('metrics', {}).get('active_requests', 0) == 0):
+            
+            print(f"System idle for {IDLE_TIMEOUT}s, swapping to lightweight model: {idle_model}")
+            await swap_model_internal(idle_model, "none", auto_download=True)
+
+async def swap_model_internal(model_id: str, quantization: str = "awq", auto_download: bool = True):
+    """Internal model swapping with Docker container restart"""
+    try:
+        # Download model if needed and requested
+        if auto_download:
+            model_path = f"{MODEL_DIR}/{model_id}"
+            if not os.path.exists(model_path) or not os.path.exists(f"{model_path}/config.json"):
+                print(f"Downloading model: {model_id}")
+                result = subprocess.run([
+                    "huggingface-cli", "download", model_id, 
+                    "--local-dir", model_path,
+                    "--local-dir-use-symlinks", "False"
+                ], capture_output=True, text=True)
+                
+                if result.returncode != 0:
+                    raise Exception(f"Failed to download model: {result.stderr}")
+        
+        # Update environment variable
+        container = docker_client.containers.get("unicorn-vllm")
+        env_vars = container.attrs['Config']['Env']
+        
+        # Restart vLLM container with new model
+        container.stop()
+        
+        # Update the model in docker-compose via environment
+        os.environ['DEFAULT_LLM_MODEL'] = model_id
+        if quantization != "none":
+            os.environ['LLM_QUANTIZATION'] = quantization
+        
+        # Restart container
+        subprocess.run(["docker", "compose", "restart", "vllm"], cwd="/app")
+        
+        return {"status": "success", "message": f"Switched to {model_id}"}
+        
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+@app.get("/api/search")
+async def search_models(query: str = "", filter_awq: bool = True, limit: int = 20):
+    """Search Hugging Face for compatible models"""
+    try:
+        # Search filters for vLLM compatibility
+        filters = {
+            "library": ["transformers", "pytorch"],
+            "task": "text-generation"
+        }
+        
+        if filter_awq:
+            # Look for AWQ quantized models
+            query_terms = [query, "AWQ"] if query else ["AWQ"]
+            query = " ".join(query_terms)
+        
+        # Search models
+        models = list_models(
+            search=query,
+            filter=filters,
+            sort="downloads",
+            direction=-1,
+            limit=limit
+        )
+        
+        compatible_models = []
+        for model in models:
+            # Filter for likely vLLM-compatible models
+            model_info = {
+                "id": model.id,
+                "downloads": getattr(model, 'downloads', 0),
+                "likes": getattr(model, 'likes', 0),
+                "tags": getattr(model, 'tags', []),
+                "pipeline_tag": getattr(model, 'pipeline_tag', ''),
+                "compatible": True,
+                "quantization": "awq" if "awq" in model.id.lower() else "none",
+                "estimated_size": estimate_model_size(model.id, getattr(model, 'tags', []))
+            }
+            
+            # Skip if not text generation
+            if model_info["pipeline_tag"] != "text-generation":
+                continue
+                
+            compatible_models.append(model_info)
+        
+        return {"models": compatible_models[:limit]}
+        
+    except Exception as e:
+        return {"error": str(e), "models": []}
+
+def estimate_model_size(model_id: str, tags: list) -> str:
+    """Estimate model size category"""
+    model_lower = model_id.lower()
+    
+    if any(size in model_lower for size in ['70b', '65b', '72b']):
+        return "large (>40GB)"
+    elif any(size in model_lower for size in ['30b', '32b', '34b']):
+        return "medium (15-40GB)"
+    elif any(size in model_lower for size in ['13b', '14b', '15b', '20b']):
+        return "small (5-15GB)"
+    elif any(size in model_lower for size in ['7b', '8b', '9b']):
+        return "tiny (<5GB)"
+    else:
+        return "unknown"
+
 @app.get("/api/performance")
 async def get_performance():
-    """Get vLLM performance metrics"""
+    """Get vLLM performance metrics and update activity"""
+    await update_activity()  # Track that system is being monitored
+    
     try:
         async with httpx.AsyncClient() as client:
             # Get metrics from vLLM
@@ -243,7 +540,8 @@ async def get_performance():
                     "active_requests": 0,
                     "pending_requests": 0,
                     "gpu_cache_usage": 0,
-                    "total_tokens_generated": 0
+                    "total_tokens_generated": 0,
+                    "idle_timeout_remaining": max(0, IDLE_TIMEOUT - int((datetime.now() - last_activity).total_seconds()))
                 }
                 
                 for line in metrics_text.split('\n'):
@@ -259,6 +557,8 @@ async def get_performance():
                     elif 'vllm:request_active' in line:
                         try:
                             metrics['active_requests'] = int(float(line.split()[-1]))
+                            if metrics['active_requests'] > 0:
+                                await update_activity()  # Activity detected
                         except:
                             pass
                     elif 'vllm:request_pending' in line:
@@ -285,5 +585,6 @@ async def get_performance():
             "active_requests": 0,
             "pending_requests": 0,
             "gpu_cache_usage": 0,
-            "total_tokens_generated": 0
+            "total_tokens_generated": 0,
+            "idle_timeout_remaining": 0
         }
