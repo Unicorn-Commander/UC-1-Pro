@@ -54,3 +54,6 @@ backups/
 # AI Assistant Files
 CLAUDE.md
 GEMINI.md
+
+# Installation State
+.install_state
