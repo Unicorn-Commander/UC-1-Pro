@@ -20,10 +20,10 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Create models directory
 RUN mkdir -p models
 
-# Download Kokoro model from onnx-community
+# Skip model download - mount it as volume instead
+# The model file is too large and unreliable to download during build
 RUN cd models && \
-    wget -O kokoro-v0_19.onnx https://huggingface.co/onnx-community/Kokoro-82M-ONNX/resolve/main/onnx/model.onnx || \
-    (echo "Download failed!" && exit 1)
+    echo "Model will be mounted as volume" > README.txt
 
 # Create voices.json file
 RUN cd models && \
