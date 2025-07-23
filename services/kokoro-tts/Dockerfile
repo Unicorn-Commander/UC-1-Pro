@@ -2,6 +2,7 @@ FROM python:3.10-slim
 
 RUN apt-get update && apt-get install -y \
     git \
+    curl \
     wget \
     libgomp1 \
     libtbb12 \
@@ -13,10 +14,16 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Download Kokoro models
-RUN mkdir -p models && cd models && \
-    wget -q https://github.com/thewh1teagle/kokoro-fastapi/releases/download/v0.1.0/kokoro-v0_19.onnx && \
-    wget -q https://github.com/thewh1teagle/kokoro-fastapi/releases/download/v0.1.0/voices.json
+# Create models directory
+RUN mkdir -p models
+
+# Download Kokoro model - try HuggingFace directly
+RUN cd models && \
+    curl -L -o kokoro-v0_19.onnx https://huggingface.co/hexgrad/Kokoro-82M/resolve/main/kokoro-v0_19.onnx
+
+# Create voices.json file
+RUN cd models && \
+    echo '{"voices": ["af", "af_bella", "af_sarah", "am_adam", "am_michael", "bf_emma", "bf_isabella", "bm_george", "bm_lewis"]}' > voices.json
 
 COPY . .
 
