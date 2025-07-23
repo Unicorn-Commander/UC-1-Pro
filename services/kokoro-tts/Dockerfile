@@ -20,12 +20,10 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Create models directory
 RUN mkdir -p models
 
-# Download Kokoro model from HuggingFace with proper error handling
+# Download Kokoro model from onnx-community
 RUN cd models && \
-    wget -O kokoro-v0_19.onnx https://huggingface.co/rinna/kokoro-speech-v0_19/resolve/main/kokoro-v0_19.onnx || \
-    (echo "Download failed, trying alternative source..." && \
-     wget -O kokoro-v0_19.onnx https://github.com/thewh1teagle/kokoro-onnx/releases/download/model/kokoro-v0_19.onnx) || \
-    (echo "Both downloads failed!" && exit 1)
+    wget -O kokoro-v0_19.onnx https://huggingface.co/onnx-community/Kokoro-82M-ONNX/resolve/main/onnx/model.onnx || \
+    (echo "Download failed!" && exit 1)
 
 # Create voices.json file
 RUN cd models && \
