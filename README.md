@@ -1,84 +1,207 @@
-# UC-1 Pro - Enterprise AI Stack for RTX 5090
+# UC-1 Pro - Enterprise AI Stack for RTX 5090 🚀
 
-A modular, production-ready AI infrastructure optimized for NVIDIA RTX 5090 GPUs.
+<div align="center">
 
-## Quick Start
+[![GitHub Stars](https://img.shields.io/github/stars/Unicorn-Commander/UC-1-Pro?style=for-the-badge)](https://github.com/Unicorn-Commander/UC-1-Pro/stargazers)
+[![License](https://img.shields.io/github/license/Unicorn-Commander/UC-1-Pro?style=for-the-badge)](LICENSE)
+[![Docker](https://img.shields.io/badge/Docker-Ready-blue?style=for-the-badge&logo=docker)](https://www.docker.com/)
+[![NVIDIA](https://img.shields.io/badge/RTX_5090-Optimized-76B900?style=for-the-badge&logo=nvidia)](https://www.nvidia.com/)
 
-**1. Clone and Install**
+**Transform your RTX 5090 into an AI powerhouse with UC-1 Pro**
+
+[🌐 Website](https://unicorncommander.com) • [📖 Documentation](http://localhost:8081) • [🏢 Company](https://magicunicorn.tech) • [🐛 Issues](https://github.com/Unicorn-Commander/UC-1-Pro/issues)
+
+</div>
+
+---
+
+## 🎯 What is UC-1 Pro?
+
+UC-1 Pro is a production-ready, modular AI infrastructure stack that unleashes the full potential of NVIDIA RTX 5090 GPUs. Built by [Magic Unicorn Unconventional Technology & Stuff Inc](https://magicunicorn.tech), it provides enterprise-grade AI capabilities with the simplicity of a single command deployment.
+
+### ✨ Key Features
+
+- **🚀 Blazing Fast Inference** - vLLM engine optimized for RTX 5090's 32GB VRAM
+- **🎙️ Advanced Speech Processing** - WhisperX STT with speaker diarization
+- **🗣️ Natural Voice Synthesis** - Kokoro TTS with multiple voice options
+- **🔍 Intelligent Search** - Self-hosted SearXNG with privacy protection
+- **📄 Document Intelligence** - OCR and document processing with Apache Tika
+- **🎨 Image Generation Ready** - ComfyUI extension for Flux models
+- **📊 Built-in Monitoring** - Prometheus & Grafana for system insights
+- **🔒 Enterprise Security** - Automated backups, SSL support, API authentication
+- **🧩 Modular Architecture** - Enable only what you need
+
+## 🚀 Quick Start
+
+### Prerequisites
+
+- Ubuntu 24.04 LTS
+- NVIDIA RTX 5090 (32GB VRAM)
+- 96GB RAM (minimum 64GB)
+- 200GB+ storage
+
+### Installation
 
 ```bash
+# Clone the repository
 git clone https://github.com/Unicorn-Commander/UC-1-Pro.git
 cd UC-1-Pro
+
+# Run the installer - it handles everything!
 ./install.sh
-```
 
-The installer will:
-- Check and install system dependencies
-- Install Docker and Docker Compose
-- Set up NVIDIA drivers and container toolkit
-- Create your `.env` configuration file
-- Run pre-flight checks
-
-**2. Start the Stack**
-
-```bash
+# Start your AI stack
 ./scripts/start.sh
 ```
 
-That's it! The install script handles everything for you.
+That's it! The installer automatically configures Docker, NVIDIA drivers, and all dependencies.
 
-## Architecture
+## 🖥️ Web Interfaces
 
-- **vLLM** on RTX 5090 for primary LLM inference
-- **WhisperX** for advanced speech-to-text
-- **Kokoro TTS** for text-to-speech
-- **Modular microservices** architecture
-- **Docker-based** deployment
+Once running, access your AI services:
 
-## Directory Structure
+| Service | URL | Description |
+|---------|-----|-------------|
+| **Open-WebUI** | http://localhost:8080 | Main AI chat interface |
+| **vLLM API** | http://localhost:8000 | OpenAI-compatible API |
+| **Documentation** | http://localhost:8081 | Full system documentation |
+| **Model Manager** | http://localhost:8084 | Manage AI models |
+| **SearXNG** | http://localhost:8888 | Private search engine |
 
+## 🏗️ Architecture
+
+<details>
+<summary>Click to expand architecture details</summary>
+
+UC-1 Pro uses a microservices architecture optimized for different hardware components:
+
+### GPU Services (RTX 5090)
+- **vLLM** - High-performance LLM inference engine
+- **ComfyUI** (Extension) - Flux image generation
+
+### CPU/Intel iGPU Services
+- **WhisperX** - Speech-to-text processing
+- **Kokoro TTS** - Text-to-speech synthesis
+- **Embeddings** - Text vectorization
+- **Reranker** - Search result optimization
+
+### Data Layer
+- **PostgreSQL** - Relational data & metadata
+- **Redis** - High-speed caching & queuing
+- **Qdrant** - Vector database for RAG
+
+</details>
+
+## 🛠️ Management Commands
+
+```bash
+# Quick actions
+make start          # Start all services
+make stop           # Stop all services
+make status         # Check service status
+make health         # Run health checks
+make logs           # View all logs
+make backup         # Backup databases
+
+# GPU management
+./scripts/gpu-memory-manager.sh balanced  # Balance GPU between services
+./scripts/gpu-memory-manager.sh full-llm  # Maximize for LLM
+
+# Extensions
+make monitoring     # Start Prometheus & Grafana
+make comfyui       # Start ComfyUI for image generation
 ```
-UC-1-Pro/
-├── docker-compose.yml      # Main orchestration
-├── .env.template           # Environment configuration template
-├── .gitignore              # Git ignore file
-├── setup-uc1-pro.sh        # Initial project setup script
-├── services/               # Modular microservices
-├── scripts/                # Management & installation scripts
-├── config/                 # Shared configuration files
-├── Drivers/                # System drivers & documentation
-├── documentation/          # Project documentation site
-└── extensions/             # Optional, standalone services
+
+## 📦 Extensions
+
+UC-1 Pro includes optional extensions for additional functionality:
+
+- **🎨 ComfyUI** - Flux image generation with Kontext support
+- **📊 Monitoring** - Prometheus + Grafana dashboards
+- **🔧 Dev Tools** - Jupyter Lab, VS Code Server, database admin
+- **🔀 Traefik** - Reverse proxy with SSL termination
+- **⚡ Bolt.DIY** - Rapid AI app development
+- **🔄 n8n** - Workflow automation
+
+Enable extensions as needed:
+```bash
+cd extensions/[extension-name]
+docker-compose up -d
 ```
 
-## Services
+## 🔧 Configuration
 
-- **Port 8080**: Open-WebUI (Main Interface)
-- **Port 8000**: vLLM API
-- **Port 8084**: Model Manager
-- **Port 9000**: WhisperX STT
-- **Port 8880**: Kokoro TTS
-- **Port 8083**: Reranker
-- **Port 8888**: SearXNG
-- **Port 9998**: Tika OCR
-- **Port 8081**: Documentation
+### Environment Variables
 
-## Requirements
+Key settings in `.env`:
 
-- Ubuntu Server 24.04 LTS
-- NVIDIA RTX 5090 (32GB VRAM)
-- 96GB RAM recommended
+```env
+# Model Selection
+DEFAULT_LLM_MODEL=Qwen/Qwen2.5-32B-Instruct-AWQ
+GPU_MEMORY_UTIL=0.95
 
-All other software dependencies (Docker, NVIDIA Container Toolkit) are installed by the `install-dependencies.sh` script.
+# Backup Schedule
+BACKUP_SCHEDULE=0 2 * * *    # Daily at 2 AM
+BACKUP_RETENTION_DAYS=7
+```
 
-For detailed architecture information, see `uc1-pro-architecture-doc.md`.
+### Switching Models
 
-## Extensions
+```bash
+# Use the model manager UI
+http://localhost:8084
 
-The `extensions/` directory contains optional services that can be run alongside the main UC-1 Pro stack. Each extension has its own `docker-compose.yml` and `README.md` with specific setup and usage instructions.
+# Or via script
+./scripts/switch-model.sh
+```
 
-To run an extension, navigate to its directory and use `docker-compose up -d`.
+## 🛡️ Security & Maintenance
 
-- **Traefik**: A modern reverse proxy and load balancer. See `extensions/traefik/README.md`.
-- **Bolt.DIY**: A development environment for building AI applications. See `extensions/bolt.diy/README.md`.
-- **n8n**: A powerful workflow automation tool. See `extensions/n8n/README.md`.
+- **Automated Backups** - Daily backups with configurable retention
+- **Health Monitoring** - Built-in health checks for all services
+- **API Authentication** - Secure API keys for all endpoints
+- **Update Management** - Simple Docker-based updates
+
+## 📚 Documentation
+
+Complete documentation is available at http://localhost:8081 after starting the stack, including:
+
+- Getting Started Guide
+- Service Documentation
+- Configuration Reference
+- Troubleshooting Tips
+- API Documentation
+
+## 🤝 Contributing
+
+We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) for details.
+
+1. Fork the repository
+2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
+3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
+4. Push to the branch (`git push origin feature/AmazingFeature`)
+5. Open a Pull Request
+
+## 📄 License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## 🏢 About
+
+UC-1 Pro is developed by [Magic Unicorn Unconventional Technology & Stuff Inc](https://magicunicorn.tech), a company dedicated to making advanced AI technology accessible and practical for real-world applications. We believe in the power of open-source collaboration and building tools that empower developers and organizations to harness the full potential of modern AI hardware.
+
+### Why UC-1 Pro?
+
+Born from the need for a production-ready AI stack that "just works," UC-1 Pro eliminates the complexity of integrating multiple AI services. Whether you're building the next generation of AI applications, running a research lab, or deploying enterprise AI solutions, UC-1 Pro provides the foundation you need to succeed.
+
+---
+
+<div align="center">
+
+**Ready to unleash your RTX 5090?**
+
+[⭐ Star this repo](https://github.com/Unicorn-Commander/UC-1-Pro) • [🚀 Get Started](#-quick-start) • [💬 Join our Community](https://github.com/Unicorn-Commander/UC-1-Pro/discussions)
+
+Built with ❤️ by [Magic Unicorn Tech](https://magicunicorn.tech)
+
+</div>
