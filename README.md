@@ -4,34 +4,28 @@ A modular, production-ready AI infrastructure optimized for NVIDIA RTX 5090 GPUs
 
 ## Quick Start
 
-**1. Install Dependencies (First Time Setup)**
-
-For a fresh Ubuntu 24.04 LTS system, run the dependency installer to set up Docker, Docker Compose, and the NVIDIA Container Toolkit.
+**1. Clone and Install**
 
 ```bash
-chmod +x scripts/install-dependencies.sh
-sudo ./scripts/install-dependencies.sh
-# Log out and log back in for the changes to take effect.
-```
-
-**2. Initial Project Setup**
-
-Clone the repository and run the setup script. This will guide you to create the necessary `.env` configuration file.
-
-```bash
-git clone https://github.com/your-username/UC-1-Pro.git
+git clone https://github.com/Unicorn-Commander/UC-1-Pro.git
 cd UC-1-Pro
-chmod +x setup-uc1-pro.sh
-./setup-uc1-pro.sh
+./install.sh
 ```
 
-**3. Start the Stack**
+The installer will:
+- Check and install system dependencies
+- Install Docker and Docker Compose
+- Set up NVIDIA drivers and container toolkit
+- Create your `.env` configuration file
+- Run pre-flight checks
 
-Once the setup is complete, you can start all services.
+**2. Start the Stack**
 
 ```bash
 ./scripts/start.sh
 ```
+
+That's it! The install script handles everything for you.
 
 ## Architecture
 
