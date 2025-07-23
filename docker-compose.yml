@@ -190,7 +190,6 @@ services:
       - /dev/dri:/dev/dri
     group_add:
       - video
-      - render
     ports:
       - "8880:8880"
     environment:
