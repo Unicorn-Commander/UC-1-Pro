@@ -1,0 +1,60 @@
+version: '3.8'
+
+services:
+  comfyui:
+    build: .
+    container_name: uc1-comfyui
+    restart: unless-stopped
+    runtime: nvidia
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=0
+      - CUDA_VISIBLE_DEVICES=0
+      - PYTORCH_CUDA_ALLOC_CONF=max_split_size_mb:512
+      - COMMANDLINE_ARGS=--gpu-only --highvram --use-pytorch-cross-attention
+    ports:
+      - "8188:8188"
+    volumes:
+      - ./models:/app/models
+      - ./custom_nodes:/app/custom_nodes
+      - ./input:/app/input
+      - ./output:/app/output
+      - ./workflows:/app/workflows
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    networks:
+      - comfyui-network
+      - uc1-network
+
+  # Optional: ComfyUI API wrapper for Open-WebUI integration
+  comfyui-openai-wrapper:
+    build: 
+      context: .
+      dockerfile: Dockerfile.wrapper
+    container_name: uc1-comfyui-wrapper
+    restart: unless-stopped
+    environment:
+      - COMFYUI_URL=http://comfyui:8188
+      - API_KEY=${COMFYUI_API_KEY:-comfy-secret-key}
+    ports:
+      - "8189:8080"
+    depends_on:
+      - comfyui
+    networks:
+      - comfyui-network
+      - uc1-network
+
+networks:
+  comfyui-network:
+    driver: bridge
+  uc1-network:
+    external: true
+    name: unicorn-network
+
+volumes:
+  comfyui_models:
+  comfyui_outputs:

@@ -1,0 +1,40 @@
+# Model files
+models/
+*.safetensors
+*.ckpt
+*.pt
+*.pth
+*.bin
+
+# Output files
+output/
+input/
+temp/
+
+# Custom nodes (except manager)
+custom_nodes/*
+!custom_nodes/ComfyUI-Manager/
+
+# Workflows (keep directory structure)
+workflows/*
+!workflows/.gitkeep
+!workflows/flux-basic.json
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Environment
+.env
+venv/
+ENV/
+
+# Logs
+*.log
+
+# OS
+.DS_Store
+Thumbs.db

@@ -1,0 +1,76 @@
+version: '3.8'
+
+services:
+  # Jupyter Lab for AI experimentation
+  jupyter:
+    image: jupyter/tensorflow-notebook:latest
+    container_name: uc1-jupyter
+    restart: unless-stopped
+    environment:
+      - JUPYTER_ENABLE_LAB=yes
+      - JUPYTER_TOKEN=${JUPYTER_TOKEN:-uc1-jupyter}
+    ports:
+      - "8889:8888"
+    volumes:
+      - ./notebooks:/home/jovyan/work
+      - jupyter_data:/home/jovyan
+    networks:
+      - uc1-network
+      - dev-network
+
+  # Code-server for web-based VS Code
+  code-server:
+    image: codercom/code-server:latest
+    container_name: uc1-code-server
+    restart: unless-stopped
+    environment:
+      - PASSWORD=${CODE_SERVER_PASSWORD:-uc1-dev}
+    ports:
+      - "8890:8080"
+    volumes:
+      - ./workspace:/home/coder/workspace
+      - code_server_data:/home/coder
+    networks:
+      - uc1-network
+      - dev-network
+
+  # Postgres Admin UI
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: uc1-pgadmin
+    restart: unless-stopped
+    environment:
+      - PGADMIN_DEFAULT_EMAIL=${PGADMIN_EMAIL:-admin@uc1.local}
+      - PGADMIN_DEFAULT_PASSWORD=${PGADMIN_PASSWORD:-admin}
+    ports:
+      - "8891:80"
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+    networks:
+      - uc1-network
+      - dev-network
+
+  # Redis Commander
+  redis-commander:
+    image: rediscommander/redis-commander:latest
+    container_name: uc1-redis-commander
+    restart: unless-stopped
+    environment:
+      - REDIS_HOSTS=local:redis:6379
+    ports:
+      - "8892:8081"
+    networks:
+      - uc1-network
+      - dev-network
+
+networks:
+  dev-network:
+    driver: bridge
+  uc1-network:
+    external: true
+    name: unicorn-network
+
+volumes:
+  jupyter_data:
+  code_server_data:
+  pgadmin_data:

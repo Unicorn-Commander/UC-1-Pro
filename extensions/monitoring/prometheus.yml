@@ -1,0 +1,82 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  # GPU Metrics
+  - job_name: 'gpu'
+    static_configs:
+      - targets: ['gpu-exporter:9835']
+        labels:
+          group: 'hardware'
+
+  # System Metrics
+  - job_name: 'node'
+    static_configs:
+      - targets: ['node-exporter:9100']
+        labels:
+          group: 'system'
+
+  # vLLM Metrics
+  - job_name: 'vllm'
+    static_configs:
+      - targets: ['vllm:8000']
+        labels:
+          group: 'ai-services'
+    metrics_path: '/metrics'
+
+  # Open-WebUI (if metrics endpoint exists)
+  - job_name: 'open-webui'
+    static_configs:
+      - targets: ['open-webui:8080']
+        labels:
+          group: 'ui'
+    metrics_path: '/metrics'
+
+  # Redis Exporter (would need to add to stack)
+  - job_name: 'redis'
+    static_configs:
+      - targets: ['redis-exporter:9121']
+        labels:
+          group: 'databases'
+
+  # PostgreSQL Exporter (would need to add to stack)  
+  - job_name: 'postgresql'
+    static_configs:
+      - targets: ['postgres-exporter:9187']
+        labels:
+          group: 'databases'
+
+  # Model Manager
+  - job_name: 'model-manager'
+    static_configs:
+      - targets: ['model-manager:8084']
+        labels:
+          group: 'ai-services'
+    metrics_path: '/metrics'
+
+  # Service Health Checks
+  - job_name: 'blackbox'
+    metrics_path: /probe
+    params:
+      module: [http_2xx]
+    static_configs:
+      - targets:
+          - http://vllm:8000/health
+          - http://open-webui:8080
+          - http://whisperx:9000/health
+          - http://kokoro:8880/health
+          - http://reranker:8080/health
+        labels:
+          group: 'health-checks'
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: blackbox-exporter:9115
+
+# Alerting rules would go here
+rule_files:
+  # - 'alerts.yml'

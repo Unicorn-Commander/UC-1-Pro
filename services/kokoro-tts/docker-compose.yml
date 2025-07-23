@@ -1,0 +1,11 @@
+version: '3.8'
+
+services:
+  kokoro-tts:
+    build: .
+    container_name: kokoro-dev
+    ports:
+      - "8880:8880"
+    environment:
+      DEVICE: "CPU"
+      DEFAULT_VOICE: "af"

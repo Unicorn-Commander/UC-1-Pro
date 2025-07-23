@@ -1,0 +1,15 @@
+version: '3.8'
+
+services:
+  docs:
+    build: .
+    container_name: unicorn-docs
+    restart: unless-stopped
+    ports:
+      - "8081:80"
+    networks:
+      - unicorn-network
+
+networks:
+  unicorn-network:
+    external: true

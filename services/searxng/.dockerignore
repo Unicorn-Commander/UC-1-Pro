@@ -1,0 +1,24 @@
+# Generated files (handled by volume mounts)
+settings.yml
+
+# Template files (not needed in the container)
+settings.yml.template
+
+# Git
+.git
+.gitignore
+
+# Python cache
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db

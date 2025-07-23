@@ -1,0 +1,31 @@
+version: '3.8'
+
+services:
+  bolt-diy:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: bolt-ai-development # This target is specified in the official documentation for development
+    container_name: bolt-diy
+    restart: unless-stopped
+    ports:
+      - "5173:5173" # Bolt.DIY runs on 5173
+    volumes:
+      - .:/app # Mounts the current directory (your cloned bolt.diy repo) into the container
+      - /app/node_modules # Exclude node_modules from the bind mount to prevent issues
+    environment:
+      # Add any necessary environment variables here, e.g., API keys for LLMs
+      # For example:
+      # OPENAI_API_KEY: "${OPENAI_API_KEY}"
+      # ANTHROPIC_API_KEY: "${ANTHROPIC_API_KEY}"
+      # GROQ_API_KEY: "${GROQ_API_KEY}"
+      # You can also configure API keys directly in the application after it's running
+      # Connect to your local vLLM instance
+      OPENAI_API_BASE_URL: "http://unicorn-vllm:8000/v1"
+      OPENAI_API_KEY: "${VLLM_API_KEY:-dummy-key}"
+    networks:
+      - unicorn-network
+
+networks:
+  unicorn-network:
+    external: true

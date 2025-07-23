@@ -1,0 +1,86 @@
+use_default_settings: true
+server:
+  bind_address: "0.0.0.0"
+  port: 8888
+  base_url: false  # Set this if you're behind a reverse proxy
+  image_proxy: true
+  method: "GET"
+  http_protocol_version: "1.0"
+  secret_key: "${SEARXNG_SECRET}"  # For cookies, CSRF, etc.
+
+search:
+  safe_search: 0
+  autocomplete: ""
+  default_lang: "all"
+  formats:
+    - json
+    - html
+  languages:
+    - all
+
+# Redis Cache Configuration
+redis:
+  url: "redis://unicorn-redis:6379/0"
+
+# Outgoing Requests Configuration
+outgoing:
+  request_timeout: 6.0
+  max_request_timeout: 15.0
+  pool_connections: 100
+  pool_maxsize: 20
+  keepalive_expiry: 5.0
+  enable_http2: true
+  retries: 1
+  retry_on_http_error: true
+
+# Proxy Configuration
+proxies:
+  http: "http://${BRIGHTDATA_USERNAME}:${BRIGHTDATA_PASSWORD}@${BRIGHTDATA_GATEWAY}:${BRIGHTDATA_PORT}"
+  https: "http://${BRIGHTDATA_USERNAME}:${BRIGHTDATA_PASSWORD}@${BRIGHTDATA_GATEWAY}:${BRIGHTDATA_PORT}"
+
+# Engine Configurations
+engines:
+  # Google
+  - name: google
+    engine: google
+    shortcut: g
+    disabled: false
+    use_mobile_ui: true
+
+  # Bing
+  - name: bing
+    engine: bing
+    shortcut: b
+    disabled: false
+
+  # Brave
+  - name: brave
+    engine: brave
+    shortcut: br
+    disabled: false
+
+  # DuckDuckGo
+  - name: duckduckgo
+    engine: duckduckgo
+    shortcut: d
+    disabled: false
+
+  # Wikipedia
+  - name: wikipedia
+    engine: wikipedia
+    shortcut: w
+    disabled: false
+
+# UI Configuration
+ui:
+  static_use_hash: true
+  default_theme: simple
+  query_in_title: true
+  center_alignment: true
+  infinite_scroll: false
+  results_on_new_tab: false
+  default_locale: "en"
+
+# Cache settings for better performance
+general:
+  debug: false

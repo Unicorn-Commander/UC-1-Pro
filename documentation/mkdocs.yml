@@ -1,0 +1,45 @@
+site_name: UC-1 Pro Documentation
+site_url: http://localhost:8081
+
+theme:
+  name: material
+  palette:
+    - scheme: default
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - scheme: slate
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.top
+    - search.suggest
+    - search.highlight
+    - content.code.annotate
+    - content.code.copy
+
+plugins:
+  - search
+
+nav:
+  - 'Introduction': 'index.md'
+  - 'Getting Started': 'getting-started.md'
+  - 'System Architecture': 'system-architecture.md'
+  - 'Service Reference':
+    - 'Open-WebUI': 'services/open-webui.md'
+    - 'vLLM': 'services/vllm.md'
+    - 'Model Manager': 'services/model-manager.md'
+    - 'WhisperX': 'services/whisperx.md'
+    - 'Kokoro TTS': 'services/kokoro-tts.md'
+    - 'Reranker': 'services/reranker.md'
+    - 'Embeddings': 'services/embeddings.md'
+    - 'SearXNG': 'services/searxng.md'
+    - 'Tika OCR': 'services/tika-ocr.md'
+    - 'Databases': 'services/databases.md'
+    - 'Monitoring': 'services/monitoring.md'
+  - 'Scripts & Tooling': 'scripts-and-tooling.md'
+  - 'Configuration': 'configuration.md'
+  - 'Extensions': 'extensions.md'

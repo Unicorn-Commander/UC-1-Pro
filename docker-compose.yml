@@ -1,0 +1,458 @@
+version: '3.8'
+
+# Shared GPU runtime configuration
+x-gpu-service: &gpu-service
+  runtime: nvidia
+  environment:
+    - NVIDIA_DRIVER_CAPABILITIES=all
+  deploy:
+    resources:
+      reservations:
+        devices:
+          - driver: nvidia
+            count: 1
+            capabilities: [gpu]
+
+services:
+  # --- Database Services ---
+  redis:
+    image: redis:7.4.5-alpine
+    container_name: unicorn-redis
+    restart: unless-stopped
+    command: >
+      redis-server
+      --maxmemory 16gb
+      --maxmemory-policy allkeys-lru
+      --maxmemory-samples 5
+      --save 900 1
+      --save 300 10
+      --save 60 10000
+      --client-output-buffer-limit normal 0 0 0
+      --client-output-buffer-limit replica 256mb 64mb 60
+      --client-output-buffer-limit pubsub 512mb 256mb 360
+      --appendonly yes
+      --appendfsync everysec
+    volumes:
+      - redis_data:/data
+      - redis_backups:/backups
+    ports:
+      - "6379:6379"
+    networks:
+      unicorn-network:
+        aliases:
+          - redis
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  postgresql:
+    image: postgres:16.9-alpine
+    container_name: unicorn-postgresql
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: "${POSTGRES_USER}"
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD}"
+      POSTGRES_DB: "${POSTGRES_DB}"
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=en_US.UTF-8"
+      POSTGRES_HOST_AUTH_METHOD: "scram-sha-256"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    networks:
+      unicorn-network:
+        aliases:
+          - postgres
+          - postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # --- Vector Database Service ---
+  qdrant:
+    image: qdrant/qdrant:v1.15.0
+    container_name: unicorn-qdrant
+    restart: unless-stopped
+    volumes:
+      - qdrant_data:/qdrant/storage
+    ports:
+      - "6333:6333"
+      - "6334:6334"
+    networks:
+      unicorn-network:
+        aliases:
+          - qdrant
+          - vectordb
+    environment:
+      QDRANT__SERVICE__GRPC_PORT: "6334"
+      QDRANT__SERVICE__HTTP_PORT: "6333"
+      QDRANT__LOG_LEVEL: "INFO"
+
+  # --- Main AI/LLM Service (RTX 5090) ---
+  vllm:
+    image: vllm/vllm-openai:v0.9.2
+    container_name: unicorn-vllm
+    restart: unless-stopped
+    <<: *gpu-service
+    ports:
+      - "8000:8000"
+    environment:
+      NVIDIA_VISIBLE_DEVICES: "0"
+      VLLM_API_KEY: "${VLLM_API_KEY:-dummy-key}"
+      HF_TOKEN: "${HF_TOKEN:-}"
+      CUDA_VISIBLE_DEVICES: "0"
+    command: >
+      --model ${DEFAULT_LLM_MODEL:-Qwen/Qwen2.5-32B-Instruct-AWQ}
+      --quantization ${LLM_QUANTIZATION:-awq}
+      --max-model-len ${MAX_MODEL_LEN:-16384}
+      --gpu-memory-utilization ${GPU_MEMORY_UTIL:-0.95}
+      --enable-prefix-caching
+      --download-dir /models
+      --tensor-parallel-size ${TENSOR_PARALLEL:-1}
+      --disable-log-requests
+      --trust-remote-code
+    volumes:
+      - vllm_models:/models
+      - vllm_cache:/root/.cache/huggingface
+    networks:
+      unicorn-network:
+        aliases:
+          - vllm
+          - llm
+          - inference
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    shm_size: '8gb'
+    ulimits:
+      memlock: -1
+      stack: 67108864
+
+  # --- Embedding Service (Intel iGPU/CPU) ---
+  embeddings:
+    image: ghcr.io/huggingface/text-embeddings-inference:cpu-1.2
+    container_name: unicorn-embeddings
+    restart: unless-stopped
+    ports:
+      - "8082:80"
+    environment:
+      MODEL_ID: "${EMBEDDING_MODEL:-BAAI/bge-base-en-v1.5}"
+      MAX_BATCH_TOKENS: "16384"
+      MAX_CLIENT_BATCH_SIZE: "32"
+    volumes:
+      - embedding_models:/data
+    networks:
+      unicorn-network:
+        aliases:
+          - embeddings
+          - embed
+
+  # --- Speech-to-Text Service: WhisperX ---
+  whisperx:
+    build: ./services/whisperx
+    container_name: unicorn-whisperx
+    restart: unless-stopped
+    ports:
+      - "9000:9000"
+    environment:
+      WHISPER_MODEL: "${WHISPER_MODEL:-base}"
+      DEVICE: "cpu"
+      COMPUTE_TYPE: "int8"
+      BATCH_SIZE: "16"
+      HF_TOKEN: "${HF_TOKEN:-}"
+    volumes:
+      - whisperx_models:/app/models
+    networks:
+      unicorn-network:
+        aliases:
+          - whisperx
+          - stt
+          - speech
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  # --- Text-to-Speech Service: Kokoro (Intel iGPU via OpenVINO) ---
+  kokoro-tts:
+    build: ./services/kokoro-tts
+    container_name: unicorn-kokoro
+    restart: unless-stopped
+    devices:
+      - /dev/dri:/dev/dri
+    group_add:
+      - video
+      - render
+    ports:
+      - "8880:8880"
+    environment:
+      DEVICE: "GPU"
+      DEFAULT_VOICE: "${KOKORO_VOICE:-af}"
+    volumes:
+      - kokoro_models:/app/models
+    networks:
+      unicorn-network:
+        aliases:
+          - kokoro
+          - tts
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8880/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  # --- Reranking Service (CPU) ---
+  reranker:
+    build: ./services/reranker
+    container_name: unicorn-reranker
+    restart: unless-stopped
+    ports:
+      - "8083:8080"
+    environment:
+      MODEL_NAME: "${RERANKER_MODEL:-BAAI/bge-reranker-v2-m3}"
+      DEVICE: "cpu"
+      MAX_LENGTH: "512"
+    volumes:
+      - reranker_models:/app/models
+    networks:
+      unicorn-network:
+        aliases:
+          - reranker
+          - rerank
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  # --- Web UI ---
+  open-webui:
+    image: ghcr.io/open-webui/open-webui:main
+    container_name: unicorn-open-webui
+    restart: unless-stopped
+    volumes:
+      - open_webui_data:/app/backend/data
+    ports:
+      - "8080:8080"
+    environment:
+      OPENAI_API_BASE_URLS: "http://unicorn-vllm:8000/v1"
+      OPENAI_API_KEYS: "${VLLM_API_KEY:-dummy-key}"
+      DATABASE_URL: "postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@unicorn-postgresql:5432/${POSTGRES_DB}"
+      WEBUI_SECRET_KEY: "${WEBUI_SECRET_KEY}"
+      VECTOR_DB: "qdrant"
+      QDRANT_URI: "http://unicorn-qdrant:6333"
+      QDRANT_API_KEY: "${QDRANT_API_KEY:-}"
+      REDIS_URL: "redis://unicorn-redis:6379/0"
+      ENABLE_WEBSOCKET_SUPPORT: "true"
+      WEBSOCKET_MANAGER: "redis"
+      WEBSOCKET_REDIS_URL: "redis://unicorn-redis:6379/1"
+      RAG_EMBEDDING_API_BASE_URL: "http://unicorn-embeddings"
+      RAG_EMBEDDING_MODEL: "${EMBEDDING_MODEL:-BAAI/bge-base-en-v1.5}"
+      RAG_RERANKING_MODEL_API_BASE_URL: "http://unicorn-reranker:8080"
+      ENABLE_TIKA_EXTRACTION: "true"
+      TIKA_BASE_URL: "http://unicorn-tika:9998"
+      ENABLE_TTS: "true"
+      TTS_PROVIDER: "custom"
+      TTS_API_URL: "http://unicorn-kokoro:8880"
+      TTS_API_KEY: ""
+      ENABLE_STT: "true" 
+      STT_PROVIDER: "custom"
+      STT_API_URL: "http://unicorn-whisperx:9000"
+      SEARCH_ENGINE: "searxng"
+      SEARXNG_URL: "http://unicorn-searxng:8080"
+      ENABLE_MODEL_FILTER: "false"
+      MODEL_FILTER_LIST: ""
+      ENABLE_OLLAMA_API: "false"
+    networks:
+      unicorn-network:
+        aliases:
+          - webui
+          - openwebui
+    depends_on:
+      postgresql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      qdrant:
+        condition: service_started # Qdrant doesn't have a healthcheck in this version
+      vllm:
+        condition: service_healthy
+
+  # --- Document Intelligence: Tika OCR Service ---
+  unicorn-tika:
+    build: ./services/tika-ocr
+    container_name: unicorn-tika
+    restart: unless-stopped
+    ports:
+      - "9998:9998"
+    environment:
+      TESSDATA_PREFIX: "/usr/share/tesseract-ocr/5/tessdata"
+      TIKA_OCR_STRATEGY: "ocr_and_text"
+      TIKA_OCR_LANGUAGE: "eng+fra+deu+spa"
+    volumes:
+      - tika_data:/tmp/tika
+    networks:
+      unicorn-network:
+        aliases:
+          - tika
+          - ocr
+
+  # --- Self-hosted Search: SearXNG ---
+  unicorn-searxng:
+    build: ./services/searxng
+    container_name: unicorn-searxng
+    restart: unless-stopped
+    volumes:
+      - ./services/searxng:/etc/searxng:rw
+    ports:
+      - "8888:8080"
+    networks:
+      unicorn-network:
+        aliases:
+          - searxng
+          - search
+    environment:
+      - BIND_ADDRESS=0.0.0.0:8080
+      - INSTANCE_NAME=UnicornCommander
+      - SEARXNG_BASE_URL=http://localhost:8888/
+      - UWSGI_WORKERS=4
+      - UWSGI_THREADS=2
+      - SEARXNG_SECRET=${SEARXNG_SECRET}
+      - SEARXNG_REDIS_URL=redis://unicorn-redis:6379/2
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - SETGID
+      - SETUID
+    depends_on:
+      redis:
+        condition: service_healthy
+
+  # --- GPU Monitoring ---
+  gpu-exporter:
+    image: utkuozdemir/nvidia_gpu_exporter:1.2.0
+    container_name: unicorn-gpu-exporter
+    restart: unless-stopped
+    runtime: nvidia
+    environment:
+      NVIDIA_VISIBLE_DEVICES: all
+    ports:
+      - "9835:9835"
+    networks:
+      unicorn-network:
+        aliases:
+          - gpu-metrics
+
+  # --- Model Manager API ---
+  model-manager:
+    build: ./services/model-manager
+    container_name: unicorn-model-manager
+    restart: unless-stopped
+    ports:
+      - "8084:8080"
+    environment:
+      VLLM_URL: "http://unicorn-vllm:8000"
+      VLLM_API_KEY: "${VLLM_API_KEY:-dummy-key}"
+    networks:
+      unicorn-network:
+        aliases:
+          - models
+          - model-manager
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # --- System Monitoring (Optional) ---
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: unicorn-prometheus
+    restart: unless-stopped
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/usr/share/prometheus/console_libraries'
+      - '--web.console.templates=/usr/share/prometheus/consoles'
+    volumes:
+      - ./config/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    ports:
+      - "9090:9090"
+    networks:
+      unicorn-network:
+        aliases:
+          - prometheus
+          - metrics
+
+  # --- Documentation Service ---
+  docs:
+    build: ./documentation
+    container_name: unicorn-docs
+    restart: unless-stopped
+    ports:
+      - "8081:80"
+    networks:
+      unicorn-network:
+        aliases:
+          - docs
+
+  # --- Automated Backup Service ---
+  backup-cron:
+    image: alpine:latest
+    container_name: unicorn-backup-cron
+    restart: unless-stopped
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB}
+      - BACKUP_SCHEDULE=${BACKUP_SCHEDULE:-0 2 * * *}
+      - BACKUP_RETENTION_DAYS=${BACKUP_RETENTION_DAYS:-7}
+    volumes:
+      - ./backups:/backups
+      - ./scripts/automated-backup.sh:/automated-backup.sh:ro
+    networks:
+      unicorn-network:
+    depends_on:
+      - postgresql
+      - redis
+    command: >
+      sh -c "
+      apk add --no-cache postgresql-client redis bash &&
+      echo '${BACKUP_SCHEDULE} /bin/bash /automated-backup.sh' > /etc/crontabs/root &&
+      crond -f -l 2"
+
+networks:
+  unicorn-network:
+    driver: bridge
+    name: unicorn-network
+    ipam:
+      driver: default
+      config:
+        - subnet: 172.20.0.0/16
+
+volumes:
+  redis_data:
+  redis_backups:
+  postgres_data:
+  qdrant_data:
+  vllm_models:
+  vllm_cache:
+  embedding_models:
+  whisperx_models:
+  kokoro_models:
+  reranker_models:
+  open_webui_data:
+  tika_data:
+  prometheus_data:

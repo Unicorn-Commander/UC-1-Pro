@@ -1,0 +1,20 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: 'nvidia_gpu'
+    static_configs:
+      - targets: ['unicorn-gpu-exporter:9835']
+
+  - job_name: 'vllm'
+    static_configs:
+      - targets: ['unicorn-vllm:8000']
+
+  - job_name: 'postgres'
+    static_configs:
+      - targets: ['unicorn-postgresql:5432']
+
+  - job_name: 'redis'
+    static_configs:
+      - targets: ['unicorn-redis:6379']
