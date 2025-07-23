@@ -156,7 +156,8 @@ mkdir -p volumes
 # Function to generate secure passwords
 generate_password() {
     local length=${1:-32}
-    openssl rand -base64 $length | tr -d "=+/" | cut -c1-$length
+    # Generate alphanumeric password without problematic characters
+    openssl rand -base64 48 | tr -d "=+/\n" | cut -c1-$length
 }
 
 # Function to generate API keys
@@ -217,11 +218,50 @@ else
             # Backup existing .env
             cp .env .env.backup
             
-            # Generate and replace passwords
-            sed -i "s/POSTGRES_PASSWORD=.*changeme.*/POSTGRES_PASSWORD=$(generate_password 24)/" .env
-            sed -i "s/WEBUI_SECRET_KEY=.*changeme.*/WEBUI_SECRET_KEY=$(generate_password 64)/" .env
-            sed -i "s/VLLM_API_KEY=.*changeme.*/VLLM_API_KEY=$(generate_api_key 'vllm')/" .env
-            sed -i "s/SEARXNG_SECRET=.*changeme.*/SEARXNG_SECRET=$(generate_password 32)/" .env
+            # Generate passwords first
+            POSTGRES_PASS=$(generate_password 24)
+            WEBUI_SECRET=$(generate_password 64)
+            VLLM_KEY=$(generate_api_key "vllm")
+            SEARXNG_SECRET=$(generate_password 32)
+            
+            # Use a safer replacement method
+            while IFS='=' read -r key value; do
+                case "$key" in
+                    "POSTGRES_PASSWORD")
+                        if [[ "$value" == *"changeme"* ]]; then
+                            echo "POSTGRES_PASSWORD=${POSTGRES_PASS}"
+                        else
+                            echo "${key}=${value}"
+                        fi
+                        ;;
+                    "WEBUI_SECRET_KEY")
+                        if [[ "$value" == *"changeme"* ]]; then
+                            echo "WEBUI_SECRET_KEY=${WEBUI_SECRET}"
+                        else
+                            echo "${key}=${value}"
+                        fi
+                        ;;
+                    "VLLM_API_KEY")
+                        if [[ "$value" == *"changeme"* ]]; then
+                            echo "VLLM_API_KEY=${VLLM_KEY}"
+                        else
+                            echo "${key}=${value}"
+                        fi
+                        ;;
+                    "SEARXNG_SECRET")
+                        if [[ "$value" == *"changeme"* ]]; then
+                            echo "SEARXNG_SECRET=${SEARXNG_SECRET}"
+                        else
+                            echo "${key}=${value}"
+                        fi
+                        ;;
+                    *)
+                        echo "${key}=${value}"
+                        ;;
+                esac
+            done < .env > .env.new
+            
+            mv .env.new .env
             
             echo -e "${GREEN}✓ Passwords updated with secure values${NC}"
             echo "Original .env backed up to .env.backup"
