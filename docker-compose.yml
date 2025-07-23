@@ -115,6 +115,7 @@ services:
       --tensor-parallel-size ${TENSOR_PARALLEL:-1}
       --disable-log-requests
       --trust-remote-code
+      --disable-v1
     volumes:
       - vllm_models:/models
       - vllm_cache:/root/.cache/huggingface
@@ -128,7 +129,8 @@ services:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 30s
       timeout: 10s
-      retries: 3
+      retries: 5
+      start_period: 120s
     shm_size: '8gb'
     ulimits:
       memlock: -1
