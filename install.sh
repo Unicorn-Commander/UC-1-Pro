@@ -153,30 +153,78 @@ echo "Creating required directories..."
 mkdir -p backups
 mkdir -p volumes
 
+# Function to generate secure passwords
+generate_password() {
+    local length=${1:-32}
+    openssl rand -base64 $length | tr -d "=+/" | cut -c1-$length
+}
+
+# Function to generate API keys
+generate_api_key() {
+    local prefix=${1:-"uc1"}
+    echo "${prefix}-$(openssl rand -hex 16)"
+}
+
 # Handle .env file
 if [ ! -f ".env" ]; then
-    echo -e "${YELLOW}Creating .env file from template...${NC}"
+    echo -e "${YELLOW}Creating .env file with secure auto-generated passwords...${NC}"
     cp .env.template .env
     
-    echo -e "${RED}IMPORTANT: Edit the .env file to set secure passwords!${NC}"
-    echo "Key variables to change:"
-    echo "  - POSTGRES_PASSWORD"
-    echo "  - WEBUI_SECRET_KEY"
-    echo "  - VLLM_API_KEY"
-    echo "  - SEARXNG_SECRET"
+    # Generate secure passwords and keys
+    POSTGRES_PASS=$(generate_password 24)
+    WEBUI_SECRET=$(generate_password 64)
+    VLLM_KEY=$(generate_api_key "vllm")
+    SEARXNG_SECRET=$(generate_password 32)
+    COMFYUI_KEY=$(generate_api_key "comfy")
+    GRAFANA_PASS=$(generate_password 16)
+    
+    # Replace default values with generated ones
+    sed -i.bak "s/POSTGRES_PASSWORD=.*/POSTGRES_PASSWORD=${POSTGRES_PASS}/" .env
+    sed -i.bak "s/WEBUI_SECRET_KEY=.*/WEBUI_SECRET_KEY=${WEBUI_SECRET}/" .env
+    sed -i.bak "s/VLLM_API_KEY=.*/VLLM_API_KEY=${VLLM_KEY}/" .env
+    sed -i.bak "s/SEARXNG_SECRET=.*/SEARXNG_SECRET=${SEARXNG_SECRET}/" .env
+    sed -i.bak "s/COMFYUI_API_KEY=.*/COMFYUI_API_KEY=${COMFYUI_KEY}/" .env
+    sed -i.bak "s/GRAFANA_PASSWORD=.*/GRAFANA_PASSWORD=${GRAFANA_PASS}/" .env
+    
+    # Clean up backup files
+    rm -f .env.bak
+    
+    echo -e "${GREEN}✓ Secure passwords generated and saved to .env${NC}"
     echo ""
-    read -p "Press Enter to open .env in editor (or Ctrl+C to edit manually later)..."
-    ${EDITOR:-nano} .env
+    echo "Generated credentials (save these!):"
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    echo "PostgreSQL Password: ${POSTGRES_PASS}"
+    echo "vLLM API Key: ${VLLM_KEY}"
+    echo "Grafana Password: admin / ${GRAFANA_PASS}"
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    echo ""
+    
+    # Optionally let user review/edit
+    read -p "Would you like to review/edit the .env file? (y/N): " -n 1 -r
+    echo
+    if [[ $REPLY =~ ^[Yy]$ ]]; then
+        ${EDITOR:-nano} .env
+    fi
 else
     echo -e "${GREEN}✓ .env file already exists${NC}"
     
     # Check for default passwords
     if grep -q "changeme\|CHANGE_ME" .env; then
         echo -e "${RED}WARNING: .env contains default passwords!${NC}"
-        read -p "Edit .env now? (Y/n): " -n 1 -r
+        read -p "Generate new secure passwords? (Y/n): " -n 1 -r
         echo
         if [[ ! $REPLY =~ ^[Nn]$ ]]; then
-            ${EDITOR:-nano} .env
+            # Backup existing .env
+            cp .env .env.backup
+            
+            # Generate and replace passwords
+            sed -i "s/POSTGRES_PASSWORD=.*changeme.*/POSTGRES_PASSWORD=$(generate_password 24)/" .env
+            sed -i "s/WEBUI_SECRET_KEY=.*changeme.*/WEBUI_SECRET_KEY=$(generate_password 64)/" .env
+            sed -i "s/VLLM_API_KEY=.*changeme.*/VLLM_API_KEY=$(generate_api_key 'vllm')/" .env
+            sed -i "s/SEARXNG_SECRET=.*changeme.*/SEARXNG_SECRET=$(generate_password 32)/" .env
+            
+            echo -e "${GREEN}✓ Passwords updated with secure values${NC}"
+            echo "Original .env backed up to .env.backup"
         fi
     fi
 fi
