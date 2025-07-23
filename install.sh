@@ -47,6 +47,25 @@ check_gpu() {
         if nvidia-smi >/dev/null 2>&1; then
             echo -e "${GREEN}✓ NVIDIA GPU detected${NC}"
             nvidia-smi --query-gpu=name --format=csv,noheader | head -1
+            
+            # Check GPU device permissions
+            if [ -e /dev/nvidia0 ]; then
+                echo -e "${GREEN}✓ GPU device accessible${NC}"
+            else
+                echo -e "${YELLOW}⚠ GPU device not accessible - may need to install drivers${NC}"
+            fi
+            
+            # Check group permissions
+            if [ "$EUID" -ne 0 ]; then
+                local missing_groups=""
+                groups | grep -q render || missing_groups="render "
+                groups | grep -q video || missing_groups="${missing_groups}video"
+                
+                if [ -n "$missing_groups" ]; then
+                    echo -e "${YELLOW}Note: Consider adding user to groups: ${missing_groups}${NC}"
+                fi
+            fi
+            
             return 0
         fi
     fi
@@ -117,10 +136,37 @@ else
     $SUDO apt-get update
     $SUDO apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
     
-    # Add current user to docker group
+    # Add current user to necessary groups
     if [ "$EUID" -ne 0 ]; then
+        echo "Adding $USER to necessary groups..."
+        
+        # Add to docker group
         $SUDO usermod -aG docker $USER
-        echo -e "${YELLOW}Added $USER to docker group. You'll need to log out and back in.${NC}"
+        
+        # Add to render and video groups for GPU access
+        if getent group render >/dev/null 2>&1; then
+            $SUDO usermod -aG render $USER
+            echo -e "${GREEN}✓ Added to render group${NC}"
+        fi
+        
+        if getent group video >/dev/null 2>&1; then
+            $SUDO usermod -aG video $USER
+            echo -e "${GREEN}✓ Added to video group${NC}"
+        fi
+        
+        echo -e "${GREEN}✓ Added to docker group${NC}"
+        
+        # Check if we need to activate groups
+        if ! groups | grep -q docker; then
+            echo -e "${YELLOW}Activating new group permissions...${NC}"
+            
+            # Re-execute the script with newgrp if not already done
+            if [ -z "$DOCKER_GROUP_ADDED" ]; then
+                echo -e "${BLUE}Re-launching installer with new permissions...${NC}"
+                export DOCKER_GROUP_ADDED=1
+                exec newgrp docker "$0" "$@"
+            fi
+        fi
     fi
 fi
 
@@ -289,9 +335,20 @@ echo "  - vLLM API: http://localhost:8000"
 echo "  - Documentation: http://localhost:8081"
 echo ""
 
-if [ "$EUID" -ne 0 ] && ! groups | grep -q docker; then
-    echo -e "${YELLOW}NOTE: You need to log out and back in for docker group changes to take effect${NC}"
-    echo "Or run: newgrp docker"
+echo ""
+
+# Final group check
+if [ "$EUID" -ne 0 ]; then
+    if groups | grep -q docker && groups | grep -q render; then
+        echo -e "${GREEN}✓ All permissions configured correctly${NC}"
+    elif groups | grep -q docker; then
+        echo -e "${GREEN}✓ Docker permissions active${NC}"
+        if ! groups | grep -q render; then
+            echo -e "${YELLOW}Note: GPU container access may require render/video groups${NC}"
+        fi
+    else
+        echo -e "${YELLOW}Note: Run 'newgrp docker' to activate Docker permissions in this session${NC}"
+    fi
 fi
 
 echo -e "\n${GREEN}Ready to start UC-1 Pro!${NC}"
