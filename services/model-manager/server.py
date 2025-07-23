@@ -41,6 +41,9 @@ AVAILABLE_MODELS = [
 class ModelSwitch(BaseModel):
     model_id: str
     quantization: str = "awq"
+    
+    class Config:
+        protected_namespaces = ()  # Disable protected namespace warning
 
 @app.get("/")
 async def root():
