@@ -8,6 +8,9 @@ RUN apt-get update && apt-get install -y \
 
 WORKDIR /app
 
+# Upgrade pip first
+RUN pip install --upgrade pip
+
 # Install WhisperX and dependencies
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
