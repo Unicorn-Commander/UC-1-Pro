@@ -20,7 +20,13 @@ with open("models/voices.json", "r") as f:
 
 # Initialize ONNX Runtime
 logger.info("Loading Kokoro model...")
-session = ort.InferenceSession("models/kokoro-v0_19.onnx")
+session = None
+try:
+    session = ort.InferenceSession("models/kokoro-v0_19.onnx")
+    logger.info("Kokoro model loaded successfully")
+except Exception as e:
+    logger.error(f"Failed to load Kokoro model: {e}")
+    logger.warning("TTS service will run in mock mode")
 
 class TTSRequest(BaseModel):
     text: str
@@ -35,6 +41,12 @@ def text_to_phonemes(text: str):
 
 def synthesize_speech(text: str, voice: str = "af", speed: float = 1.0):
     """Synthesize speech using Kokoro model"""
+    if session is None:
+        # Return silence if model not loaded
+        logger.warning("Model not loaded, returning silence")
+        # Return 1 second of silence at 24kHz
+        return np.zeros(24000, dtype=np.float32)
+    
     # Prepare input
     phonemes = text_to_phonemes(text)
     
@@ -61,6 +73,10 @@ def synthesize_speech(text: str, voice: str = "af", speed: float = 1.0):
     audio = np.clip(audio, -1, 1)
     
     return audio
+
+@app.get("/health")
+async def health():
+    return {"status": "ok", "model_loaded": session is not None}
 
 @app.post("/v1/audio/speech")
 async def text_to_speech(request: TTSRequest):
