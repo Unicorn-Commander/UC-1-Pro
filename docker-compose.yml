@@ -196,7 +196,7 @@ services:
       DEVICE: "GPU"
       DEFAULT_VOICE: "${KOKORO_VOICE:-af}"
     volumes:
-      - kokoro_models:/app/models
+      - ./volumes/kokoro_models:/app/models
     networks:
       unicorn-network:
         aliases:
