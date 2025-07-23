@@ -1,30 +1,22 @@
 FROM searxng/searxng:latest
 
-# Install additional packages if needed
-USER root
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends \
-    python3-pip \
-    python3-jinja2 \
-    python3-dotenv \
-    curl && \
-    apt-get clean && \
-    rm -rf /var/lib/apt/lists/*
+# The base image already includes all necessary dependencies
+# We just need to copy our configuration
 
-# Create directory for configuration files
+USER root
+
+# Create directory for configuration files if needed
 RUN mkdir -p /etc/searxng
 
 # Copy our own uwsgi.ini (optional)
 COPY uwsgi.ini /etc/searxng/uwsgi.ini
 
-# The settings.yml will be mounted at runtime
-
 # Return to non-root user
 USER searxng
 
-# Health check
+# Health check using wget (already available in Alpine)
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:8888/healthz || exit 1
+    CMD wget --no-verbose --tries=1 --spider http://localhost:8080/healthz || exit 1
 
 # Default command
 CMD ["/usr/local/searxng/dockerfiles/docker-entrypoint.sh"]
