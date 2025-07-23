@@ -3,7 +3,9 @@ from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
 import httpx
 import os
-from typing import List, Dict
+from typing import List, Dict, Optional
+import asyncio
+import time
 
 app = FastAPI(title="UC-1 Pro Model Manager")
 
@@ -82,15 +84,34 @@ async def root():
         </div>
         
         <script>
+            let performanceInterval = null;
+            
             async function checkStatus() {
                 try {
                     const response = await fetch('/api/status');
                     const data = await response.json();
                     const statusClass = data.ready ? 'ready' : 'loading';
-                    document.getElementById('status').innerHTML = `
+                    
+                    let statusHtml = `
                         <strong>Model:</strong> ${data.current_model || 'None loaded'}<br>
                         <strong>Status:</strong> <span class="${statusClass}">${data.ready ? 'Ready' : 'Not ready'}</span>
                     `;
+                    
+                    // Get performance metrics if model is ready
+                    if (data.ready) {
+                        const perfResponse = await fetch('/api/performance');
+                        const perfData = await perfResponse.json();
+                        
+                        if (!perfData.error) {
+                            statusHtml += `<br><br><strong>Performance:</strong><br>`;
+                            statusHtml += `• Tokens/sec: ${perfData.tokens_per_second.toFixed(1)}<br>`;
+                            statusHtml += `• Active requests: ${perfData.active_requests}<br>`;
+                            statusHtml += `• GPU cache usage: ${perfData.gpu_cache_usage.toFixed(1)}%<br>`;
+                            statusHtml += `• Total tokens: ${perfData.total_tokens_generated.toLocaleString()}`;
+                        }
+                    }
+                    
+                    document.getElementById('status').innerHTML = statusHtml;
                 } catch (e) {
                     document.getElementById('status').innerHTML = '<span class="error">Error checking status</span>';
                 }
@@ -149,24 +170,44 @@ async def list_available_models():
 
 @app.get("/api/status")
 async def get_status():
-    """Get current model status"""
+    """Get current model status with performance metrics"""
     try:
         async with httpx.AsyncClient() as client:
-            response = await client.get(
+            # Get model info
+            models_response = await client.get(
                 f"{VLLM_URL}/v1/models",
                 headers={"Authorization": f"Bearer {VLLM_API_KEY}"}
             )
-            if response.status_code == 200:
-                data = response.json()
+            
+            # Get metrics if available
+            metrics = {}
+            try:
+                metrics_response = await client.get(f"{VLLM_URL}/metrics")
+                if metrics_response.status_code == 200:
+                    metrics_text = metrics_response.text
+                    # Parse tokens/sec from Prometheus metrics
+                    for line in metrics_text.split('\n'):
+                        if 'vllm:generation_tokens_total' in line and not line.startswith('#'):
+                            tokens_total = float(line.split()[-1])
+                            metrics['tokens_total'] = tokens_total
+                        elif 'vllm:request_duration_seconds_count' in line and not line.startswith('#'):
+                            request_count = float(line.split()[-1])
+                            metrics['request_count'] = request_count
+            except:
+                pass
+            
+            if models_response.status_code == 200:
+                data = models_response.json()
                 current_model = data['data'][0]['id'] if data['data'] else None
                 return {
                     "current_model": current_model,
-                    "ready": True
+                    "ready": True,
+                    "metrics": metrics
                 }
     except:
         pass
     
-    return {"current_model": None, "ready": False}
+    return {"current_model": None, "ready": False, "metrics": {}}
 
 @app.post("/api/switch")
 async def switch_model(request: ModelSwitch):
@@ -182,4 +223,67 @@ async def switch_model(request: ModelSwitch):
 
 @app.get("/health")
 async def health():
+    """Health check endpoint"""
     return {"status": "healthy"}
+
+@app.get("/api/performance")
+async def get_performance():
+    """Get vLLM performance metrics"""
+    try:
+        async with httpx.AsyncClient() as client:
+            # Get metrics from vLLM
+            metrics_response = await client.get(f"{VLLM_URL}/metrics")
+            
+            if metrics_response.status_code == 200:
+                metrics_text = metrics_response.text
+                
+                # Parse key metrics
+                metrics = {
+                    "tokens_per_second": 0,
+                    "active_requests": 0,
+                    "pending_requests": 0,
+                    "gpu_cache_usage": 0,
+                    "total_tokens_generated": 0
+                }
+                
+                for line in metrics_text.split('\n'):
+                    if line.startswith('#') or not line.strip():
+                        continue
+                    
+                    # Parse vLLM metrics
+                    if 'vllm:generation_tokens_total' in line:
+                        try:
+                            metrics['total_tokens_generated'] = float(line.split()[-1])
+                        except:
+                            pass
+                    elif 'vllm:request_active' in line:
+                        try:
+                            metrics['active_requests'] = int(float(line.split()[-1]))
+                        except:
+                            pass
+                    elif 'vllm:request_pending' in line:
+                        try:
+                            metrics['pending_requests'] = int(float(line.split()[-1]))
+                        except:
+                            pass
+                    elif 'vllm:gpu_cache_usage_perc' in line:
+                        try:
+                            metrics['gpu_cache_usage'] = float(line.split()[-1])
+                        except:
+                            pass
+                    elif 'vllm:avg_generation_throughput_toks_per_s' in line:
+                        try:
+                            metrics['tokens_per_second'] = float(line.split()[-1])
+                        except:
+                            pass
+                
+                return metrics
+    except Exception as e:
+        return {
+            "error": str(e),
+            "tokens_per_second": 0,
+            "active_requests": 0,
+            "pending_requests": 0,
+            "gpu_cache_usage": 0,
+            "total_tokens_generated": 0
+        }
