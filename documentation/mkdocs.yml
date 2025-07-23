@@ -42,4 +42,5 @@ nav:
     - 'Monitoring': 'services/monitoring.md'
   - 'Scripts & Tooling': 'scripts-and-tooling.md'
   - 'Configuration': 'configuration.md'
+  - 'Port Mapping': 'port-mapping.md'
   - 'Extensions': 'extensions.md'

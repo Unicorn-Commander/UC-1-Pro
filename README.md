@@ -128,7 +128,7 @@ UC-1 Pro includes optional extensions for additional functionality:
 - **🎨 ComfyUI** - Flux image generation with Kontext support
 - **📊 Monitoring** - Prometheus + Grafana dashboards
 - **🔧 Dev Tools** - Jupyter Lab, VS Code Server, database admin
-- **🐳 Portainer** - Visual Docker management interface (default: ucadmin/MagicUnicorn!8-)
+- **🐳 Portainer** - Visual Docker management interface at port 9444 (default: ucadmin/MagicUnicorn!8-)
 - **🔀 Traefik** - Reverse proxy with SSL termination
 - **⚡ Bolt.DIY** - Rapid AI app development
 - **🔄 n8n** - Workflow automation
