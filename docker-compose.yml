@@ -1,5 +1,3 @@
-version: '3.8'
-
 # Shared GPU runtime configuration
 x-gpu-service: &gpu-service
   runtime: nvidia
