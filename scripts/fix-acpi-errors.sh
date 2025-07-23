@@ -74,9 +74,9 @@ echo -e "${GREEN}✓ Created NVIDIA power management config${NC}"
 
 # Check for BIOS updates
 echo -e "\n${BLUE}=== System Information ===${NC}"
-echo "Motherboard: $(dmidecode -s baseboard-manufacturer) $(dmidecode -s baseboard-product-name) 2>/dev/null || echo "Unknown"
-echo "BIOS Version: $(dmidecode -s bios-version) 2>/dev/null || echo "Unknown"
-echo "BIOS Date: $(dmidecode -s bios-release-date) 2>/dev/null || echo "Unknown"
+echo "Motherboard: $(dmidecode -s baseboard-manufacturer 2>/dev/null || echo 'Unknown') $(dmidecode -s baseboard-product-name 2>/dev/null || echo 'Unknown')"
+echo "BIOS Version: $(dmidecode -s bios-version 2>/dev/null || echo 'Unknown')"
+echo "BIOS Date: $(dmidecode -s bios-release-date 2>/dev/null || echo 'Unknown')"
 
 echo -e "\n${YELLOW}Consider checking for BIOS updates from your motherboard manufacturer${NC}"
 echo "These ACPI errors often indicate outdated BIOS ACPI tables"
