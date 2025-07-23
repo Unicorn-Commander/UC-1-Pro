@@ -13,6 +13,17 @@ Kokoro TTS is a text-to-speech service that generates natural-sounding speech fr
 - **Build Context**: `services/kokoro-tts`
 - **Port**: `8880`
 - **Hardware**: Intel iGPU (via OpenVINO)
+- **Model**: kokoro-v0_19.onnx (~300MB)
+
+## Model Management
+
+The Kokoro TTS model can be pre-downloaded for faster startup:
+
+```bash
+./scripts/download-models.sh
+```
+
+The model is stored in `./volumes/kokoro_models/` and mounted into the container. If the model is not present, the service will attempt to download it on startup, though this may fail due to rate limits.
 
 ## API Endpoints
 

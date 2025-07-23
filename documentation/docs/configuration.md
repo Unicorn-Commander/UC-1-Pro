@@ -40,3 +40,56 @@ These variables control security aspects of the web-facing services.
 - `WEBUI_SECRET_KEY`: A secret key used by Open-WebUI for session management and security. **This should be changed to a long, random, and secret string.** (Default: `a_very_secret_key_changeme`)
 - `QDRANT_API_KEY`: The API key for the Qdrant vector database, if you have configured one in Qdrant's own settings. (Default: blank)
 - `SEARXNG_SECRET`: A secret key for the SearXNG metasearch engine. **This should be changed to a long, random, and secret string.** (Default: `another_very_secret_key_changeme`)
+
+## Model Management
+
+UC-1 Pro includes several options for managing AI models:
+
+### Pre-downloading Models
+
+To improve startup performance, you can pre-download models using the provided script:
+
+```bash
+./scripts/download-models.sh
+```
+
+This script will:
+- Download Kokoro TTS model (~300MB)
+- Optionally download vLLM models (15-70GB)
+- Create placeholder files for auto-downloading models
+
+### Model Storage Locations
+
+Models are stored in the following directories:
+- `./volumes/vllm_models/` - Large language models for vLLM
+- `./volumes/kokoro_models/` - Kokoro TTS ONNX models
+- `./volumes/whisperx_models/` - WhisperX speech recognition models
+- `./volumes/embedding_models/` - Text embedding models
+- `./volumes/reranker_models/` - Reranking models
+
+### Switching Models
+
+To switch between different LLM models:
+
+1. **Via Web UI**: Navigate to http://localhost:8084 and use the Model Manager interface
+2. **Via Configuration**: Update `DEFAULT_LLM_MODEL` in `.env` and restart vLLM:
+   ```bash
+   docker compose restart vllm
+   ```
+3. **Via Script**: Use the provided script:
+   ```bash
+   ./scripts/switch-model.sh
+   ```
+
+### Available Models
+
+Popular models that work well with UC-1 Pro:
+- `Qwen/Qwen2.5-32B-Instruct-AWQ` (Default, excellent all-around)
+- `casperhansen/gemma-2-27b-it-awq` (Google's latest)
+- `meta-llama/Llama-3.1-70B-Instruct-AWQ` (Larger, slower, higher quality)
+- `mistralai/Mistral-7B-Instruct-v0.3` (Small, fast)
+
+## Backup Configuration
+
+- `BACKUP_SCHEDULE`: Cron expression for automated backups (Default: `0 2 * * *` - daily at 2 AM)
+- `BACKUP_RETENTION_DAYS`: Number of days to keep backup files (Default: `7`)

@@ -6,73 +6,133 @@ This guide provides a step-by-step process for setting up the UC-1 Pro stack on 
 
 Before you begin, ensure your system meets the following requirements:
 
-- **Operating System**: Ubuntu 24.04 LTS
+- **Operating System**: Ubuntu 24.04 LTS (Secure Boot compatible)
 - **GPU**: NVIDIA RTX 5090 with 32GB VRAM
-- **RAM**: 96GB recommended
-- **Storage**: At least 100GB of free space for models and data.
+- **RAM**: 96GB recommended (64GB minimum)
+- **Storage**: 200GB+ of free space (500GB+ recommended for multiple models)
+- **Network**: Internet connection for downloading models and images
 
-## Step 1: Install Dependencies
+## Step 1: Clone the Repository
 
-The first step is to install the necessary software dependencies. This includes Docker, Docker Compose, and the NVIDIA Container Toolkit. We have created a script to automate this process.
-
-```bash
-# Make the script executable
-chmod +x scripts/install-dependencies.sh
-
-# Run the script with sudo
-sudo ./scripts/install-dependencies.sh
-```
-
-After the script completes, you **must log out and log back in** for the user group changes to take effect. This allows you to run Docker commands without `sudo`.
-
-To verify the installation, run the following command:
+First, clone the UC-1 Pro repository from GitHub:
 
 ```bash
-docker run --rm --gpus all nvidia/cuda:12.0-base nvidia-smi
-```
-
-This should output the status of your NVIDIA GPU, confirming that Docker is correctly configured to use it.
-
-## Step 2: Clone and Configure the Project
-
-Next, clone the project repository from GitHub and navigate into the project directory.
-
-```bash
-git clone https://github.com/your-username/UC-1-Pro.git
+git clone https://github.com/Unicorn-Commander/UC-1-Pro.git
 cd UC-1-Pro
 ```
 
-Now, run the initial setup script. This script will check for the required `.env` file and guide you to create it.
+## Step 2: Run the Installer
+
+UC-1 Pro includes a comprehensive installer that handles all dependencies automatically:
 
 ```bash
-chmod +x setup-uc1-pro.sh
-./setup-uc1-pro.sh
+# Make the installer executable
+chmod +x install.sh
+
+# Run the installer
+./install.sh
 ```
 
-If the `.env` file does not exist, you will be prompted to create it from the template:
+The installer will:
+- ✅ Install Docker and Docker Compose
+- ✅ Configure NVIDIA drivers (with Secure Boot support if needed)
+- ✅ Install NVIDIA Container Toolkit
+- ✅ Set up user permissions
+- ✅ Create necessary directories
+- ✅ Generate secure passwords for services
+- ✅ Validate your GPU configuration
+
+**Note**: If you have Secure Boot enabled, follow the on-screen instructions for signing the NVIDIA driver kernel module.
+
+## Step 3: Pre-download Models (Optional but Recommended)
+
+To speed up the initial startup, you can pre-download all required models:
 
 ```bash
-cp .env.template .env
+./scripts/download-models.sh
 ```
 
-Now, open the `.env` file in a text editor and customize the settings. At a minimum, you should change the default passwords and secret keys.
+This script will:
+- Download the Kokoro TTS model (~300MB)
+- Optionally download the vLLM model (15-70GB depending on selection)
+- Create marker files for other models that auto-download
 
-## Step 3: Start the Application Stack
+## Step 4: Start the Stack
 
-Once the configuration is complete, you can start the entire application stack using the `start.sh` script.
+Once installation is complete, start all services:
 
 ```bash
-./scripts/start.sh
+./start.sh
 ```
 
-This will pull all the necessary Docker images and start all the services in the background. The initial startup may take some time as the models are downloaded.
+The first startup may take 10-30 minutes if models need to be downloaded. You can monitor progress with:
 
-## Step 4: Accessing the Services
+```bash
+# View all logs
+docker compose logs -f
 
-Once the stack is running, you can access the various services through your web browser:
+# View specific service logs
+docker compose logs -f vllm
+```
 
-- **Open-WebUI**: `http://localhost:8080`
-- **Model Manager**: `http://localhost:8084`
-- **Prometheus (Monitoring)**: `http://localhost:9090`
+## Step 5: Access the Services
 
-Congratulations! The UC-1 Pro stack is now up and running.
+Once running, access your AI services through these URLs:
+
+| Service | URL | Description |
+|---------|-----|-------------|
+| **Open-WebUI** | http://localhost:8080 | Main AI chat interface |
+| **vLLM API** | http://localhost:8000/docs | OpenAI-compatible API |
+| **Model Manager** | http://localhost:8084 | Switch between LLM models |
+| **SearXNG** | http://localhost:8888 | Private search engine |
+| **Documentation** | http://localhost:8081 | This documentation |
+| **GPU Metrics** | http://localhost:9835/metrics | NVIDIA GPU statistics |
+
+## Step 6: Verify Installation
+
+Run a quick health check to ensure all services are running correctly:
+
+```bash
+make health
+```
+
+You should see all services reporting as "healthy".
+
+## Quick Management Commands
+
+UC-1 Pro includes convenient commands for managing your stack:
+
+```bash
+# Service management
+make start          # Start all services
+make stop           # Stop all services
+make restart        # Restart all services
+make status         # Check service status
+make logs           # View all logs
+
+# Maintenance
+make backup         # Backup databases
+make update         # Update all images
+
+# Model management
+./scripts/download-models.sh    # Pre-download models
+./scripts/switch-model.sh       # Switch LLM models
+```
+
+## Next Steps
+
+- 📖 Read the [Configuration Guide](configuration.md) to customize your setup
+- 🔧 Explore [Extensions](extensions.md) for additional features
+- 📊 Set up [Monitoring](services/monitoring.md) for system insights
+- 🎨 Try [ComfyUI](../extensions/comfyui/README.md) for image generation
+
+## Troubleshooting
+
+If you encounter issues:
+
+1. **GPU not detected**: Run `nvidia-smi` to verify driver installation
+2. **Services unhealthy**: Check logs with `docker compose logs [service-name]`
+3. **Port conflicts**: Ensure no other services are using the required ports
+4. **Out of memory**: Adjust `GPU_MEMORY_UTIL` in `.env` file
+
+For more help, see our [Troubleshooting Guide](troubleshooting.md) or open an issue on [GitHub](https://github.com/Unicorn-Commander/UC-1-Pro/issues).

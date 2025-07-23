@@ -29,6 +29,13 @@ set +a
 
 echo -e "\n${GREEN}Starting UC-1 Pro stack...${NC}"
 
+# Check if models are downloaded
+if [ ! -f "volumes/kokoro_models/kokoro-v0_19.onnx" ]; then
+    echo -e "${YELLOW}Note: Some models are not downloaded yet.${NC}"
+    echo -e "${YELLOW}Run './scripts/download-models.sh' to pre-download models for faster startup.${NC}"
+    echo ""
+fi
+
 # Pull images first
 echo "Pulling Docker images..."
 docker-compose pull

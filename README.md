@@ -30,15 +30,17 @@ UC-1 Pro is a production-ready, modular AI infrastructure stack that unleashes t
 - **📊 Built-in Monitoring** - Prometheus & Grafana for system insights
 - **🔒 Enterprise Security** - Automated backups, SSL support, API authentication
 - **🧩 Modular Architecture** - Enable only what you need
+- **⚡ Smart Health Checks** - Accurate service status monitoring
+- **📥 Model Pre-download** - Optional script to download models before startup
 
 ## 🚀 Quick Start
 
 ### Prerequisites
 
-- Ubuntu 24.04 LTS
+- Ubuntu 24.04 LTS (Secure Boot compatible)
 - NVIDIA RTX 5090 (32GB VRAM)
 - 96GB RAM (minimum 64GB)
-- 200GB+ storage
+- 200GB+ storage (500GB+ recommended for models)
 
 ### Installation
 
@@ -50,11 +52,14 @@ cd UC-1-Pro
 # Run the installer - it handles everything!
 ./install.sh
 
+# (Optional) Pre-download models for faster startup
+./scripts/download-models.sh
+
 # Start your AI stack
 ./start.sh
 ```
 
-That's it! The installer automatically configures Docker, NVIDIA drivers, and all dependencies.
+That's it! The installer automatically configures Docker, NVIDIA drivers (with Secure Boot support), and all dependencies.
 
 ## 🖥️ Web Interfaces
 
@@ -103,6 +108,10 @@ make health         # Run health checks
 make logs           # View all logs
 make backup         # Backup databases
 
+# Model management
+./scripts/download-models.sh       # Pre-download all models
+./scripts/switch-model.sh          # Switch between LLM models
+
 # GPU management
 ./scripts/gpu-memory-manager.sh balanced  # Balance GPU between services
 ./scripts/gpu-memory-manager.sh full-llm  # Maximize for LLM
@@ -119,7 +128,7 @@ UC-1 Pro includes optional extensions for additional functionality:
 - **🎨 ComfyUI** - Flux image generation with Kontext support
 - **📊 Monitoring** - Prometheus + Grafana dashboards
 - **🔧 Dev Tools** - Jupyter Lab, VS Code Server, database admin
-- **🐳 Portainer** - Visual Docker management interface
+- **🐳 Portainer** - Visual Docker management interface (default: ucadmin/MagicUnicorn!8-)
 - **🔀 Traefik** - Reverse proxy with SSL termination
 - **⚡ Bolt.DIY** - Rapid AI app development
 - **🔄 n8n** - Workflow automation

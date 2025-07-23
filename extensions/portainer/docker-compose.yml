@@ -16,11 +16,7 @@ services:
     networks:
       - portainer-network
       - uc1-network
-    command: >
-      --http-enabled
-      --admin-password-file /run/secrets/portainer_pass
-    secrets:
-      - portainer_pass
+    command: --http-enabled
 
   # Optional: Portainer Agent for better container management
   portainer-agent:
@@ -45,6 +41,6 @@ networks:
 volumes:
   portainer_data:
 
-secrets:
-  portainer_pass:
-    file: ./portainer_password.txt
+# Note: Set admin password on first login
+# Username: ucadmin  
+# Password: MagicUnicorn!8-)

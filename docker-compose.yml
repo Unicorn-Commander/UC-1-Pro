@@ -115,7 +115,7 @@ services:
       --trust-remote-code
       --enforce-eager
     volumes:
-      - vllm_models:/models
+      - ./volumes/vllm_models:/models
       - vllm_cache:/root/.cache/huggingface
     networks:
       unicorn-network:
