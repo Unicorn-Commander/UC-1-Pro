@@ -7,9 +7,9 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 NC='\033[0m'
 
-# Directory where this script is located
+# Directory where this script is located (should be project root)
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-cd "$SCRIPT_DIR/.."
+cd "$SCRIPT_DIR"
 
 echo -e "${GREEN}UC-1 Pro Deployment Script${NC}"
 echo "================================"

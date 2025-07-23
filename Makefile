@@ -25,7 +25,7 @@ help:
 	@echo "  make comfyui     - Start ComfyUI extension"
 
 start:
-	@./scripts/start.sh
+	@./start.sh
 
 stop:
 	@docker-compose down
@@ -70,3 +70,15 @@ monitoring:
 comfyui:
 	@cd extensions/comfyui && docker-compose up -d
 	@echo "ComfyUI started at http://localhost:8188"
+
+portainer:
+	@if [ ! -f extensions/portainer/portainer_password.txt ]; then \
+		echo "Creating Portainer admin password..."; \
+		openssl rand -base64 12 > extensions/portainer/portainer_password.txt; \
+		chmod 600 extensions/portainer/portainer_password.txt; \
+		echo "Admin password saved to extensions/portainer/portainer_password.txt"; \
+	fi
+	@cd extensions/portainer && docker-compose up -d
+	@echo "Portainer started at http://localhost:9000"
+	@echo "Username: admin"
+	@echo "Password: $$(cat extensions/portainer/portainer_password.txt)"

@@ -1,0 +1,5 @@
+portainer_password.txt
+*.pem
+*.key
+*.crt
+certs/

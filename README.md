@@ -51,7 +51,7 @@ cd UC-1-Pro
 ./install.sh
 
 # Start your AI stack
-./scripts/start.sh
+./start.sh
 ```
 
 That's it! The installer automatically configures Docker, NVIDIA drivers, and all dependencies.
@@ -119,6 +119,7 @@ UC-1 Pro includes optional extensions for additional functionality:
 - **🎨 ComfyUI** - Flux image generation with Kontext support
 - **📊 Monitoring** - Prometheus + Grafana dashboards
 - **🔧 Dev Tools** - Jupyter Lab, VS Code Server, database admin
+- **🐳 Portainer** - Visual Docker management interface
 - **🔀 Traefik** - Reverse proxy with SSL termination
 - **⚡ Bolt.DIY** - Rapid AI app development
 - **🔄 n8n** - Workflow automation
