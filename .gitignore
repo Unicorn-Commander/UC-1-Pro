@@ -50,3 +50,7 @@ backups/
 *.sql
 *.sql.gz
 *.rdb
+
+# AI Assistant Files
+CLAUDE.md
+GEMINI.md
