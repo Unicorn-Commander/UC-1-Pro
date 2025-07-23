@@ -12,10 +12,10 @@ RUN apt-get update && \
 # Set Tesseract data path
 ENV TESSDATA_PREFIX=/usr/share/tesseract-ocr/4.00/tessdata
 
-# Download Tika server with fallback
-ENV TIKA_VERSION=2.9.2
-RUN curl -L -o /tika-server.jar https://archive.apache.org/dist/tika/${TIKA_VERSION}/tika-server-standard-${TIKA_VERSION}.jar || \
-    curl -L -o /tika-server.jar https://dlcdn.apache.org/tika/${TIKA_VERSION}/tika-server-standard-${TIKA_VERSION}.jar || \
+# Download Tika server - use direct mirror
+ENV TIKA_VERSION=3.2.1
+RUN curl -L -o /tika-server.jar https://dlcdn.apache.org/tika/${TIKA_VERSION}/tika-server-standard-${TIKA_VERSION}.jar || \
+    curl -L -o /tika-server.jar https://archive.apache.org/dist/tika/3.2.1/tika-server-standard-3.2.1.jar || \
     (echo "Failed to download Tika server!" && exit 1)
 
 EXPOSE 9998
