@@ -247,18 +247,56 @@ if [ "$INSTALL_STATE" = "stage2" ]; then
                 
                 case $REPLY in
                     1)
-                        echo -e "${GREEN}Using signed driver installation...${NC}"
-                        echo "Run: ${GREEN}sudo ./scripts/sign-nvidia-driver.sh${NC}"
+                        echo -e "\n${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+                        echo -e "${BLUE}         Secure Boot Driver Signing Instructions          ${NC}"
+                        echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
                         echo ""
-                        echo "This will:"
-                        echo "- Create MOK signing keys"
-                        echo "- Require a reboot to enroll keys"
-                        echo "- Install signed driver after enrollment"
+                        echo -e "${YELLOW}STEP 1: Run this command to start the signing process:${NC}"
+                        echo ""
+                        echo -e "    ${GREEN}sudo ./scripts/sign-nvidia-driver.sh${NC}"
+                        echo ""
+                        echo -e "${YELLOW}What this will do:${NC}"
+                        echo "  • Create MOK (Machine Owner Key) signing keys"
+                        echo "  • Ask you to create a password (REMEMBER THIS!)"
+                        echo "  • Import the key for enrollment"
+                        echo ""
+                        echo -e "${YELLOW}STEP 2: After running the command, you'll need to:${NC}"
+                        echo "  1. Reboot your system"
+                        echo "  2. Watch for a blue MOK management screen"
+                        echo "  3. Select 'Enroll MOK' → 'Continue' → 'Yes'"
+                        echo "  4. Enter the password you created"
+                        echo "  5. Select 'Reboot'"
+                        echo ""
+                        echo -e "${YELLOW}STEP 3: After enrollment is complete:${NC}"
+                        echo "  • Run the signing script again to install the driver"
+                        echo "  • Then continue with: ${GREEN}./install.sh${NC}"
+                        echo ""
+                        echo -e "${BLUE}Copy and run:${NC}"
+                        echo -e "${GREEN}sudo ./scripts/sign-nvidia-driver.sh${NC}"
+                        echo ""
                         exit 0
                         ;;
                     2)
-                        echo -e "${GREEN}Using Ubuntu's pre-signed driver...${NC}"
-                        echo "Run: ${GREEN}./scripts/install-ubuntu-nvidia-driver.sh${NC}"
+                        echo -e "\n${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+                        echo -e "${BLUE}      Ubuntu Pre-signed Driver Installation               ${NC}"
+                        echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+                        echo ""
+                        echo -e "${YELLOW}This method uses Ubuntu's pre-signed drivers that work${NC}"
+                        echo -e "${YELLOW}with Secure Boot without requiring MOK enrollment.${NC}"
+                        echo ""
+                        echo -e "${GREEN}Run this command:${NC}"
+                        echo ""
+                        echo -e "    ${GREEN}./scripts/install-ubuntu-nvidia-driver.sh${NC}"
+                        echo ""
+                        echo -e "${YELLOW}What will happen:${NC}"
+                        echo "  • Shows available NVIDIA drivers"
+                        echo "  • Installs the recommended version"
+                        echo "  • Works immediately with Secure Boot"
+                        echo "  • Requires a reboot after installation"
+                        echo ""
+                        echo -e "${BLUE}Copy and run:${NC}"
+                        echo -e "${GREEN}./scripts/install-ubuntu-nvidia-driver.sh${NC}"
+                        echo ""
                         exit 0
                         ;;
                     3)
@@ -274,14 +312,23 @@ if [ "$INSTALL_STATE" = "stage2" ]; then
                 $SUDO ./$DRIVER_FILE --silent --dkms
                 
                 if [ $? -ne 0 ]; then
-                    echo -e "${RED}Driver installation failed!${NC}"
+                    echo -e "\n${RED}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+                    echo -e "${RED}              Driver Installation Failed!                 ${NC}"
+                    echo -e "${RED}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
                     echo ""
                     if mokutil --sb-state 2>/dev/null | grep -q "SecureBoot enabled"; then
-                        echo "This is likely due to Secure Boot. Try:"
-                        echo "1. ${GREEN}sudo ./scripts/sign-nvidia-driver.sh${NC} (recommended)"
-                        echo "2. ${GREEN}./scripts/install-ubuntu-nvidia-driver.sh${NC}"
-                        echo "3. Disable Secure Boot in BIOS"
+                        echo -e "${YELLOW}This is likely due to Secure Boot being enabled.${NC}"
+                        echo ""
+                        echo -e "${GREEN}OPTION 1: Sign the driver (Recommended)${NC}"
+                        echo -e "Copy and run: ${GREEN}sudo ./scripts/sign-nvidia-driver.sh${NC}"
+                        echo ""
+                        echo -e "${GREEN}OPTION 2: Use Ubuntu's pre-signed driver${NC}"
+                        echo -e "Copy and run: ${GREEN}./scripts/install-ubuntu-nvidia-driver.sh${NC}"
+                        echo ""
+                        echo -e "${GREEN}OPTION 3: Disable Secure Boot in BIOS${NC}"
+                        echo "(Not recommended for security reasons)"
                     fi
+                    echo ""
                     exit 1
                 fi
                 

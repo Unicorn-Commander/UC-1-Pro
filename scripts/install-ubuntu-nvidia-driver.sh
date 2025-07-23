@@ -10,10 +10,11 @@ YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m'
 
-echo -e "${BLUE}Installing Ubuntu's Pre-signed NVIDIA Driver${NC}"
-echo "==========================================="
+echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+echo -e "${BLUE}    Installing Ubuntu's Pre-signed NVIDIA Driver          ${NC}"
+echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo ""
-echo "This method works with Secure Boot enabled!"
+echo -e "${GREEN}✓ This method works with Secure Boot enabled!${NC}"
 echo ""
 
 # Update package lists
@@ -37,9 +38,16 @@ sudo ubuntu-drivers autoinstall
 
 echo -e "\n${GREEN}✓ Driver installation complete!${NC}"
 echo ""
-echo -e "${YELLOW}IMPORTANT: A reboot is required${NC}"
+echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+echo -e "${BLUE}                    Next Steps                            ${NC}"
+echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo ""
-echo "Next steps:"
-echo "1. Reboot: ${GREEN}sudo reboot${NC}"
-echo "2. Verify GPU: ${GREEN}nvidia-smi${NC}"
-echo "3. Continue installation: ${GREEN}cd ~/UC-1-Pro && ./install.sh${NC}"
+echo -e "${YELLOW}1. Reboot your system (REQUIRED):${NC}"
+echo -e "   ${GREEN}sudo reboot${NC}"
+echo ""
+echo -e "${YELLOW}2. Verify GPU after boot:${NC}"
+echo -e "   ${GREEN}nvidia-smi${NC}"
+echo ""
+echo -e "${YELLOW}3. Continue UC-1 Pro installation:${NC}"
+echo -e "   ${GREEN}cd ~/UC-1-Pro && ./install.sh${NC}"
+echo ""

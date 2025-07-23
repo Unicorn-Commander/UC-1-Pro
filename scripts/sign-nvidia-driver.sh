@@ -10,8 +10,9 @@ YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m'
 
-echo -e "${BLUE}NVIDIA Driver Signing for Secure Boot${NC}"
-echo "======================================"
+echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+echo -e "${BLUE}      NVIDIA Driver Signing for Secure Boot               ${NC}"
+echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 
 # Check if running as root
 if [ "$EUID" -ne 0 ]; then 
@@ -59,17 +60,24 @@ if [ -z "$MOK_ENROLLED" ]; then
     mokutil --import MOK.der
     
     echo -e "\n${RED}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-    echo -e "${RED}STOP! You must reboot and enroll the MOK key first!${NC}"
+    echo -e "${RED}     ACTION REQUIRED: Reboot to Enroll MOK Key           ${NC}"
     echo -e "${RED}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
     echo ""
-    echo "After reboot, you'll see a blue MOK management screen:"
-    echo "1. Select 'Enroll MOK'"
-    echo "2. Select 'Continue'"
-    echo "3. Select 'Yes'"
-    echo "4. Enter the password you just created"
-    echo "5. Select 'Reboot'"
+    echo -e "${YELLOW}STEP 1: Reboot your system now${NC}"
+    echo -e "Command: ${GREEN}sudo reboot${NC}"
     echo ""
-    echo -e "${YELLOW}After MOK enrollment, run this script again to install the driver${NC}"
+    echo -e "${YELLOW}STEP 2: At the blue MOK management screen:${NC}"
+    echo "  1. Select 'Enroll MOK'"
+    echo "  2. Select 'Continue'"
+    echo "  3. Select 'Yes'"
+    echo "  4. Enter the password you just created"
+    echo "  5. Select 'Reboot'"
+    echo ""
+    echo -e "${YELLOW}STEP 3: After enrollment is complete:${NC}"
+    echo -e "Run this script again: ${GREEN}sudo ./scripts/sign-nvidia-driver.sh${NC}"
+    echo ""
+    echo -e "${BLUE}Next command to run:${NC}"
+    echo -e "${GREEN}sudo reboot${NC}"
     echo ""
     exit 0
 fi
@@ -108,12 +116,23 @@ else
     exit 1
 fi
 
-echo -e "\n${BLUE}Next steps:${NC}"
-echo "1. Reboot: sudo reboot"
+echo -e "\n${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+echo -e "${BLUE}                    Next Steps                            ${NC}"
+echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+echo ""
+echo -e "${YELLOW}1. Reboot your system:${NC}"
+echo -e "   ${GREEN}sudo reboot${NC}"
+echo ""
 if [ -n "$NEEDS_REBOOT" ]; then
-    echo "2. Complete MOK enrollment at the blue screen"
-    echo "3. After boot, verify with: nvidia-smi"
+    echo -e "${YELLOW}2. Complete MOK enrollment at the blue screen${NC}"
+    echo ""
+    echo -e "${YELLOW}3. Verify GPU after boot:${NC}"
+    echo -e "   ${GREEN}nvidia-smi${NC}"
 else
-    echo "2. After boot, verify with: nvidia-smi"
+    echo -e "${YELLOW}2. Verify GPU after boot:${NC}"
+    echo -e "   ${GREEN}nvidia-smi${NC}"
 fi
-echo "3. Continue installation: cd ~/UC-1-Pro && ./install.sh"
+echo ""
+echo -e "${YELLOW}3. Continue UC-1 Pro installation:${NC}"
+echo -e "   ${GREEN}cd ~/UC-1-Pro && ./install.sh${NC}"
+echo ""
