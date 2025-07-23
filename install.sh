@@ -139,16 +139,10 @@ else
     echo "Installing NVIDIA Container Toolkit..."
     
     if [ -f "./Drivers/install-nvidia-container-toolkit.sh" ]; then
-        $SUDO bash ./Drivers/install-nvidia-container-toolkit.sh
+        bash ./Drivers/install-nvidia-container-toolkit.sh
     else
-        # Fallback installation
-        distribution=$(. /etc/os-release;echo $ID$VERSION_ID)
-        curl -s -L https://nvidia.github.io/nvidia-docker/gpgkey | $SUDO apt-key add -
-        curl -s -L https://nvidia.github.io/nvidia-docker/$distribution/nvidia-docker.list | $SUDO tee /etc/apt/sources.list.d/nvidia-docker.list
-        
-        $SUDO apt-get update
-        $SUDO apt-get install -y nvidia-container-toolkit
-        $SUDO systemctl restart docker
+        echo -e "${RED}NVIDIA Container Toolkit installer not found${NC}"
+        echo "Please install manually or check the repository"
     fi
 fi
 
