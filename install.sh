@@ -232,10 +232,20 @@ if [ "$INSTALL_STATE" = "stage2" ]; then
             echo -e "${GREEN}✓ nvitop already installed${NC}"
         else
             echo "Installing nvitop..."
-            $SUDO apt-get install -y python3-pip
-            pip3 install --user nvitop
+            # Check if pipx is available (preferred for Ubuntu 24.04)
+            if ! command_exists pipx; then
+                echo "Installing pipx..."
+                $SUDO apt-get install -y pipx
+                pipx ensurepath
+            fi
+            
+            # Install nvitop using pipx
+            echo "Installing nvitop with pipx..."
+            pipx install nvitop
+            
             echo -e "${GREEN}✓ nvitop installed${NC}"
-            echo "  Run 'nvitop' to monitor GPU usage"
+            echo "  You may need to run: source ~/.bashrc"
+            echo "  Then run 'nvitop' to monitor GPU usage"
         fi
     else
         echo -e "\n${RED}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
