@@ -69,6 +69,13 @@ else
     check "warning" "NVIDIA Docker runtime not detected - GPU features won't work"
 fi
 
+# Check nvitop installation
+if command -v nvitop &> /dev/null; then
+    check "ok" "nvitop is installed for GPU monitoring"
+else
+    check "warning" "nvitop not installed - run: pip3 install --user nvitop"
+fi
+
 # Check for required directories
 for dir in scripts services config backups; do
     if [ -d "$dir" ]; then
@@ -80,12 +87,12 @@ done
 
 # Check script permissions
 SCRIPTS=(
-    "setup-uc1-pro.sh"
-    "scripts/start.sh"
+    "install.sh"
+    "start.sh"
     "scripts/backup.sh"
     "scripts/health-check.sh"
-    "scripts/install-dependencies.sh"
-    "scripts/automated-backup.sh"
+    "scripts/gpu-memory-manager.sh"
+    "scripts/switch-model.sh"
 )
 
 for script in "${SCRIPTS[@]}"; do
@@ -126,8 +133,9 @@ if [ $ERRORS -eq 0 ] && [ $WARNINGS -eq 0 ]; then
     echo -e "${GREEN}All checks passed! Ready for deployment.${NC}"
     echo ""
     echo "Next steps:"
-    echo "1. Run: ./scripts/start.sh"
+    echo "1. Run: ./start.sh"
     echo "2. Monitor startup: docker-compose logs -f"
+    echo "3. Monitor GPU: nvitop"
     exit 0
 elif [ $ERRORS -eq 0 ]; then
     echo -e "${YELLOW}Checks passed with $WARNINGS warnings.${NC}"

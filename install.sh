@@ -222,134 +222,64 @@ if [ "$INSTALL_STATE" = "stage2" ]; then
         fi
     fi
     
-    # NVIDIA Driver Installation
+    # NVIDIA Driver Check
     if check_gpu; then
-        echo -e "${GREEN}✓ NVIDIA GPU already configured${NC}"
-    else
-        echo -e "${YELLOW}NVIDIA GPU not detected. Checking for drivers...${NC}"
+        echo -e "${GREEN}✓ NVIDIA GPU detected and configured${NC}"
         
-        # Check if driver installer exists
+        # Install nvitop for GPU monitoring
+        echo -e "\n${BLUE}=== Installing nvitop for GPU monitoring ===${NC}"
+        if command_exists nvitop; then
+            echo -e "${GREEN}✓ nvitop already installed${NC}"
+        else
+            echo "Installing nvitop..."
+            $SUDO apt-get install -y python3-pip
+            pip3 install --user nvitop
+            echo -e "${GREEN}✓ nvitop installed${NC}"
+            echo "  Run 'nvitop' to monitor GPU usage"
+        fi
+    else
+        echo -e "\n${RED}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+        echo -e "${RED}              NVIDIA Driver Not Detected!                 ${NC}"
+        echo -e "${RED}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+        echo ""
+        echo -e "${YELLOW}UC-1 Pro requires NVIDIA drivers to be installed first.${NC}"
+        echo ""
+        echo -e "${BLUE}Option 1: Download NVIDIA Driver${NC}"
+        echo "  1. Visit: ${GREEN}https://www.nvidia.com/drivers${NC}"
+        echo "  2. Select your GPU (RTX 5090)"
+        echo "  3. Download the Linux 64-bit driver"
+        echo "  4. Place the downloaded .run file in this directory"
+        echo ""
+        echo -e "${BLUE}Option 2: Use Ubuntu's Pre-signed Driver${NC}"
+        echo "  Run: ${GREEN}./scripts/install-ubuntu-nvidia-driver.sh${NC}"
+        echo "  (Works with Secure Boot enabled)"
+        echo ""
+        echo -e "${BLUE}After installing drivers:${NC}"
+        echo "  1. Reboot your system"
+        echo "  2. Run this installer again: ${GREEN}./install.sh${NC}"
+        echo ""
+        
+        # Check if driver file exists in directory
         if ls NVIDIA-Linux-x86_64-*.run 1> /dev/null 2>&1; then
             DRIVER_FILE=$(ls NVIDIA-Linux-x86_64-*.run | head -1)
-            echo -e "${GREEN}Found driver installer: $DRIVER_FILE${NC}"
+            echo -e "${GREEN}Found driver file: $DRIVER_FILE${NC}"
+            echo ""
             
-            # Check if Secure Boot is enabled
+            # Check Secure Boot status
             if mokutil --sb-state 2>/dev/null | grep -q "SecureBoot enabled"; then
-                echo -e "${YELLOW}Secure Boot is enabled!${NC}"
-                echo ""
-                echo "Options:"
-                echo "1. Use signed driver (recommended)"
-                echo "2. Use Ubuntu's pre-signed driver"
-                echo "3. Install unsigned (will fail with Secure Boot)"
-                echo ""
-                read -p "Choose option (1-3): " -n 1 -r
-                echo
-                
-                case $REPLY in
-                    1)
-                        echo -e "\n${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-                        echo -e "${BLUE}         Secure Boot Driver Signing Instructions          ${NC}"
-                        echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-                        echo ""
-                        echo -e "${YELLOW}STEP 1: Run this command to start the signing process:${NC}"
-                        echo ""
-                        echo -e "    ${GREEN}sudo ./scripts/sign-nvidia-driver.sh${NC}"
-                        echo ""
-                        echo -e "${YELLOW}What this will do:${NC}"
-                        echo "  • Create MOK (Machine Owner Key) signing keys"
-                        echo "  • Ask you to create a password (REMEMBER THIS!)"
-                        echo "  • Import the key for enrollment"
-                        echo ""
-                        echo -e "${YELLOW}STEP 2: After running the command, you'll need to:${NC}"
-                        echo "  1. Reboot your system"
-                        echo "  2. Watch for a blue MOK management screen"
-                        echo "  3. Select 'Enroll MOK' → 'Continue' → 'Yes'"
-                        echo "  4. Enter the password you created"
-                        echo "  5. Select 'Reboot'"
-                        echo ""
-                        echo -e "${YELLOW}STEP 3: After enrollment is complete:${NC}"
-                        echo "  • Run the signing script again to install the driver"
-                        echo "  • Then continue with: ${GREEN}./install.sh${NC}"
-                        echo ""
-                        echo -e "${BLUE}Copy and run:${NC}"
-                        echo -e "${GREEN}sudo ./scripts/sign-nvidia-driver.sh${NC}"
-                        echo ""
-                        exit 0
-                        ;;
-                    2)
-                        echo -e "\n${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-                        echo -e "${BLUE}      Ubuntu Pre-signed Driver Installation               ${NC}"
-                        echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-                        echo ""
-                        echo -e "${YELLOW}This method uses Ubuntu's pre-signed drivers that work${NC}"
-                        echo -e "${YELLOW}with Secure Boot without requiring MOK enrollment.${NC}"
-                        echo ""
-                        echo -e "${GREEN}Run this command:${NC}"
-                        echo ""
-                        echo -e "    ${GREEN}./scripts/install-ubuntu-nvidia-driver.sh${NC}"
-                        echo ""
-                        echo -e "${YELLOW}What will happen:${NC}"
-                        echo "  • Shows available NVIDIA drivers"
-                        echo "  • Installs the recommended version"
-                        echo "  • Works immediately with Secure Boot"
-                        echo "  • Requires a reboot after installation"
-                        echo ""
-                        echo -e "${BLUE}Copy and run:${NC}"
-                        echo -e "${GREEN}./scripts/install-ubuntu-nvidia-driver.sh${NC}"
-                        echo ""
-                        exit 0
-                        ;;
-                    3)
-                        echo -e "${YELLOW}Warning: This will likely fail with Secure Boot enabled${NC}"
-                        ;;
-                esac
+                echo -e "${YELLOW}Note: Secure Boot is enabled on this system${NC}"
+                echo "You'll need to either:"
+                echo "  • Use signed drivers: ${GREEN}sudo ./scripts/sign-nvidia-driver.sh${NC}"
+                echo "  • Use Ubuntu drivers: ${GREEN}./scripts/install-ubuntu-nvidia-driver.sh${NC}"
+                echo "  • Disable Secure Boot in BIOS"
+            else
+                echo "To install the driver manually:"
+                echo "  ${GREEN}sudo ./$DRIVER_FILE --silent --dkms${NC}"
             fi
-            
-            read -p "Install NVIDIA driver now? (Y/n): " -n 1 -r
-            echo
-            if [[ ! $REPLY =~ ^[Nn]$ ]]; then
-                echo "Installing NVIDIA driver..."
-                $SUDO ./$DRIVER_FILE --silent --dkms
-                
-                if [ $? -ne 0 ]; then
-                    echo -e "\n${RED}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-                    echo -e "${RED}              Driver Installation Failed!                 ${NC}"
-                    echo -e "${RED}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-                    echo ""
-                    if mokutil --sb-state 2>/dev/null | grep -q "SecureBoot enabled"; then
-                        echo -e "${YELLOW}This is likely due to Secure Boot being enabled.${NC}"
-                        echo ""
-                        echo -e "${GREEN}OPTION 1: Sign the driver (Recommended)${NC}"
-                        echo -e "Copy and run: ${GREEN}sudo ./scripts/sign-nvidia-driver.sh${NC}"
-                        echo ""
-                        echo -e "${GREEN}OPTION 2: Use Ubuntu's pre-signed driver${NC}"
-                        echo -e "Copy and run: ${GREEN}./scripts/install-ubuntu-nvidia-driver.sh${NC}"
-                        echo ""
-                        echo -e "${GREEN}OPTION 3: Disable Secure Boot in BIOS${NC}"
-                        echo "(Not recommended for security reasons)"
-                    fi
-                    echo ""
-                    exit 1
-                fi
-                
-                save_state "stage3_reboot_required"
-                
-                echo -e "\n${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-                echo -e "${YELLOW}NVIDIA driver installed - REBOOT REQUIRED!${NC}"
-                echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-                echo ""
-                echo "Please reboot your system for the driver to take effect."
-                echo ""
-                echo -e "${GREEN}Command to continue after reboot:${NC}"
-                echo "  cd $(pwd) && ./install.sh"
-                echo ""
-                exit 0
-            fi
-        else
-            echo -e "${YELLOW}No NVIDIA driver installer found.${NC}"
-            echo "Download driver from: https://www.nvidia.com/drivers"
-            echo "Or run: ./Drivers/install-nvidia-driver.sh"
         fi
+        
+        echo ""
+        exit 1
     fi
     
     # NVIDIA Container Toolkit
@@ -374,11 +304,7 @@ fi
 # ============================================================================
 # STAGE 3: UC-1 Pro Configuration
 # ============================================================================
-if [ "$INSTALL_STATE" = "stage3" ] || [ "$INSTALL_STATE" = "stage3_reboot_required" ]; then
-    if [ "$INSTALL_STATE" = "stage3_reboot_required" ]; then
-        echo -e "${GREEN}✓ Continuing after NVIDIA driver installation${NC}"
-        save_state "stage3"
-    fi
+if [ "$INSTALL_STATE" = "stage3" ]; then
     
     echo -e "\n${BLUE}=== Stage 3: UC-1 Pro Configuration ===${NC}"
     
