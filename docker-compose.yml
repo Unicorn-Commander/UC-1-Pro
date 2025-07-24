@@ -353,32 +353,35 @@ services:
         aliases:
           - gpu-metrics
 
-  # --- Model Manager API ---
-  model-manager:
-    build: ./services/model-manager
-    container_name: unicorn-model-manager
+  # --- UC-1 Pro Admin Dashboard ---
+  admin-dashboard:
+    build: ./services/admin-dashboard
+    container_name: unicorn-admin
     restart: unless-stopped
     ports:
-      - "8084:8080"
+      - "8084:8084"
     environment:
       VLLM_URL: "http://unicorn-vllm:8000"
       VLLM_API_KEY: "${VLLM_API_KEY:-dummy-key}"
       HF_TOKEN: "${HF_TOKEN:-}"
+      ADMIN_USERNAME: "${ADMIN_USERNAME:-ucadmin}"
+      ADMIN_PASSWORD: "${ADMIN_PASSWORD:-MagicUnicorn!8-)}"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
-      - ./volumes/vllm_models:/models
+      - ./volumes:/volumes:ro
       - ./.env:/.env:ro
+      - ./docker-compose.yml:/docker-compose.yml:ro
     networks:
       unicorn-network:
         aliases:
-          - models
-          - model-manager
+          - admin
+          - dashboard
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:8084/api/v1/system/status"]
       interval: 30s
       timeout: 10s
-      retries: 10
-      start_period: 30s  # Model manager starts quickly
+      retries: 5
+      start_period: 30s
 
   # --- System Monitoring (Optional) ---
   prometheus:

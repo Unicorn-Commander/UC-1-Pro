@@ -1,0 +1,31 @@
+{
+  "name": "uc1-pro-admin-dashboard",
+  "version": "2.0.0",
+  "description": "Professional admin dashboard for UC-1 Pro",
+  "private": true,
+  "dependencies": {
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "react-router-dom": "^6.20.0",
+    "axios": "^1.6.2",
+    "socket.io-client": "^4.7.2",
+    "recharts": "^2.10.1",
+    "lucide-react": "^0.294.0",
+    "@headlessui/react": "^1.7.17",
+    "@heroicons/react": "^2.0.18",
+    "clsx": "^2.0.0",
+    "framer-motion": "^10.16.5"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.2.0",
+    "autoprefixer": "^10.4.16",
+    "postcss": "^8.4.32",
+    "tailwindcss": "^3.3.6",
+    "vite": "^5.0.7"
+  },
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  }
+}
