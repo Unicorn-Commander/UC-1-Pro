@@ -10,6 +10,7 @@ import Layout from './components/Layout';
 import ErrorBoundary from './components/ErrorBoundary';
 import LoadingScreen from './components/LoadingScreen';
 import { SystemProvider, useSystem } from './contexts/SystemContext';
+import { ThemeProvider } from './contexts/ThemeContext';
 
 function AppContent() {
   const { loading, error } = useSystem();
@@ -49,9 +50,11 @@ function AppContent() {
 function App() {
   return (
     <ErrorBoundary>
-      <SystemProvider>
-        <AppContent />
-      </SystemProvider>
+      <ThemeProvider>
+        <SystemProvider>
+          <AppContent />
+        </SystemProvider>
+      </ThemeProvider>
     </ErrorBoundary>
   );
 }
