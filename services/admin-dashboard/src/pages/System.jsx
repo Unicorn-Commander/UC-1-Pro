@@ -85,7 +85,7 @@ export default function System() {
             <div>
               <p className="text-sm text-gray-600 dark:text-gray-400">Memory</p>
               <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                {formatBytes(systemStatus.memory.used)}
+                {formatBytes(systemStatus.memory?.used || 0)}
               </p>
               <p className="text-xs text-gray-500 mt-1">
                 of {formatBytes(systemStatus.memory?.total || 0)} ({systemStatus.memory?.percent?.toFixed(1) || 0}%)
@@ -105,7 +105,7 @@ export default function System() {
             <div>
               <p className="text-sm text-gray-600 dark:text-gray-400">Storage</p>
               <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                {formatBytes(systemStatus.disk.used)}
+                {formatBytes(systemStatus.disk?.used || 0)}
               </p>
               <p className="text-xs text-gray-500 mt-1">
                 of {formatBytes(systemStatus.disk?.total || 0)} ({systemStatus.disk?.percent?.toFixed(1) || 0}%)
