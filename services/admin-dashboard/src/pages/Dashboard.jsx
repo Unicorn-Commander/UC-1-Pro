@@ -14,7 +14,7 @@ const getServices = () => {
     name: 'Chat UI',
     icon: '💬',
     description: 'Main AI chat interface',
-    url: `http://${host}:8080',
+    url: `http://${host}:8080`,
     port: 8080,
     status: 'healthy'
   },
@@ -23,7 +23,7 @@ const getServices = () => {
     name: 'vLLM API',
     icon: '🤖',
     description: 'Large language model inference',
-    url: `http://${host}:8000/docs',
+    url: `http://${host}:8000/docs`,
     port: 8000,
     status: 'healthy'
   },
@@ -32,7 +32,7 @@ const getServices = () => {
     name: 'Search',
     icon: '🔍',
     description: 'Private search engine',
-    url: `http://${host}:8888',
+    url: `http://${host}:8888`,
     port: 8888,
     status: 'healthy'
   },
@@ -41,7 +41,7 @@ const getServices = () => {
     name: 'Documentation',
     icon: '📚',
     description: 'System documentation',
-    url: `http://${host}:8081',
+    url: `http://${host}:8081`,
     port: 8081,
     status: 'healthy'
   },
@@ -50,7 +50,7 @@ const getServices = () => {
     name: 'WhisperX',
     icon: '🎤',
     description: 'Speech-to-text',
-    url: `http://${host}:9000',
+    url: `http://${host}:9000`,
     port: 9000,
     status: 'healthy'
   },
@@ -59,7 +59,7 @@ const getServices = () => {
     name: 'Kokoro TTS',
     icon: '🔊',
     description: 'Text-to-speech',
-    url: `http://${host}:8880',
+    url: `http://${host}:8880`,
     port: 8880,
     status: 'healthy'
   },
@@ -68,7 +68,7 @@ const getServices = () => {
     name: 'Embeddings',
     icon: '🔢',
     description: 'Text embeddings',
-    url: `http://${host}:8082',
+    url: `http://${host}:8082`,
     port: 8082,
     status: 'healthy'
   },
@@ -77,7 +77,7 @@ const getServices = () => {
     name: 'Reranker',
     icon: '📊',
     description: 'Search reranking',
-    url: `http://${host}:8083',
+    url: `http://${host}:8083`,
     port: 8083,
     status: 'healthy'
   },
@@ -86,7 +86,7 @@ const getServices = () => {
     name: 'Metrics',
     icon: '📈',
     description: 'System monitoring',
-    url: `http://${host}:9090',
+    url: `http://${host}:9090`,
     port: 9090,
     status: 'healthy'
   },
@@ -95,7 +95,7 @@ const getServices = () => {
     name: 'Portainer',
     icon: '🐳',
     description: 'Container management',
-    url: `http://${host}:9444',
+    url: `http://${host}:9444`,
     port: 9444,
     status: 'healthy'
   },
@@ -104,7 +104,7 @@ const getServices = () => {
     name: 'GPU Monitor',
     icon: '🎮',
     description: 'NVIDIA GPU metrics',
-    url: `http://${host}:9835/metrics',
+    url: `http://${host}:9835/metrics`,
     port: 9835,
     status: 'healthy'
   },
@@ -113,7 +113,7 @@ const getServices = () => {
     name: 'Document OCR',
     icon: '📄',
     description: 'Text extraction',
-    url: `http://${host}:9998',
+    url: `http://${host}:9998`,
     port: 9998,
     status: 'healthy'
   }
