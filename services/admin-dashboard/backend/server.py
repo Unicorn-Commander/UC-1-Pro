@@ -397,8 +397,20 @@ def get_directory_size(path):
                 total_size += os.path.getsize(filepath)
     return total_size
 
-# Mount static files for the React app
-app.mount("/", StaticFiles(directory="dist", html=True), name="static")
+# Serve the React app index.html for all non-API routes
+@app.get("/{full_path:path}")
+async def serve_react_app(full_path: str):
+    # Check if it's an API route
+    if full_path.startswith("api/") or full_path.startswith("ws"):
+        raise HTTPException(status_code=404, detail="Not found")
+    
+    # Check if the file exists in dist
+    file_path = os.path.join("dist", full_path)
+    if os.path.exists(file_path) and os.path.isfile(file_path):
+        return FileResponse(file_path)
+    
+    # Otherwise, serve index.html for client-side routing
+    return FileResponse("dist/index.html")
 
 if __name__ == "__main__":
     import uvicorn
