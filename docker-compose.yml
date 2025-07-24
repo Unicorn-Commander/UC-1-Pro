@@ -367,7 +367,7 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - ./volumes/vllm_models:/models
-      - /usr/local/bin/docker:/usr/local/bin/docker:ro
+      - ./.env:/.env:ro
     networks:
       unicorn-network:
         aliases:

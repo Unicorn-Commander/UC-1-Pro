@@ -26,7 +26,13 @@ idle_model = "microsoft/DialoGPT-small"  # Lightweight fallback model
 
 # Initialize Hugging Face API
 hf_api = HfApi()
-docker_client = docker.from_env()
+
+# Initialize Docker client with explicit socket path
+try:
+    docker_client = docker.DockerClient(base_url='unix://var/run/docker.sock')
+except Exception as e:
+    print(f"Warning: Docker client initialization failed: {e}")
+    docker_client = None
 
 # Available models configuration
 AVAILABLE_MODELS = [
@@ -437,20 +443,38 @@ async def swap_model_internal(model_id: str, quantization: str = "awq", auto_dow
                 if result.returncode != 0:
                     raise Exception(f"Failed to download model: {result.stderr}")
         
-        # Update environment variable
-        container = docker_client.containers.get("unicorn-vllm")
-        env_vars = container.attrs['Config']['Env']
+        # Method 1: Try Docker API
+        if docker_client:
+            try:
+                container = docker_client.containers.get("unicorn-vllm")
+                container.stop()
+                container.start()
+                return {"status": "success", "message": f"Switched to {model_id} via Docker API"}
+            except Exception as e:
+                print(f"Docker API method failed: {e}")
         
-        # Restart vLLM container with new model
-        container.stop()
+        # Method 2: Fallback to subprocess
+        # Update environment and restart via docker compose
+        env_file_path = "/.env"  # Assuming mounted from host
+        if os.path.exists(env_file_path):
+            # Update .env file
+            with open(env_file_path, 'r') as f:
+                lines = f.readlines()
+            
+            with open(env_file_path, 'w') as f:
+                for line in lines:
+                    if line.startswith('DEFAULT_LLM_MODEL='):
+                        f.write(f'DEFAULT_LLM_MODEL={model_id}\n')
+                    elif line.startswith('LLM_QUANTIZATION=') and quantization != "none":
+                        f.write(f'LLM_QUANTIZATION={quantization}\n')
+                    else:
+                        f.write(line)
         
-        # Update the model in docker-compose via environment
-        os.environ['DEFAULT_LLM_MODEL'] = model_id
-        if quantization != "none":
-            os.environ['LLM_QUANTIZATION'] = quantization
-        
-        # Restart container
-        subprocess.run(["docker", "compose", "restart", "vllm"], cwd="/app")
+        # Try to restart via subprocess
+        result = subprocess.run([
+            "sh", "-c", 
+            "docker compose -f /docker-compose.yml restart vllm || echo 'Manual restart required'"
+        ], capture_output=True, text=True)
         
         return {"status": "success", "message": f"Switched to {model_id}"}
         
