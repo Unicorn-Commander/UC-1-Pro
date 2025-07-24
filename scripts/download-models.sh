@@ -128,7 +128,7 @@ download_hf_model() {
     
     # Use huggingface-cli if available, otherwise use git lfs
     if command -v huggingface-cli &> /dev/null; then
-        huggingface-cli download "$model_id" --local-dir "$model_dir/$model_id" --local-dir-use-symlinks False
+        huggingface-cli download "$model_id" --local-dir "$model_dir/$model_id" --local-dir-use-symlinks False --resume-download
     else
         # Install git-lfs if not present
         if ! command -v git-lfs &> /dev/null; then

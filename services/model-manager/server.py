@@ -362,7 +362,8 @@ async def download_model(model_id: str):
         result = subprocess.run([
             "huggingface-cli", "download", model_id,
             "--local-dir", model_path,
-            "--local-dir-use-symlinks", "False"
+            "--local-dir-use-symlinks", "False",
+            "--resume-download"
         ], capture_output=True, text=True)
         
         if result.returncode == 0:
@@ -434,10 +435,12 @@ async def swap_model_internal(model_id: str, quantization: str = "awq", auto_dow
             model_path = f"{MODEL_DIR}/{model_id}"
             if not os.path.exists(model_path) or not os.path.exists(f"{model_path}/config.json"):
                 print(f"Downloading model: {model_id}")
+                # huggingface-cli already supports resume!
                 result = subprocess.run([
                     "huggingface-cli", "download", model_id, 
                     "--local-dir", model_path,
-                    "--local-dir-use-symlinks", "False"
+                    "--local-dir-use-symlinks", "False",
+                    "--resume-download"  # This enables resumption
                 ], capture_output=True, text=True)
                 
                 if result.returncode != 0:
