@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException, WebSocket
+from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
@@ -654,31 +654,42 @@ async def websocket_endpoint(websocket: WebSocket):
     await websocket.accept()
     try:
         # Send initial data
-        system_status = await get_system_status()
-        await websocket.send_json({"type": "system_update", "data": system_status})
-        
-        services = await list_services()
-        await websocket.send_json({"type": "services_update", "data": services})
-        
-        models = await get_models()
-        await websocket.send_json({"type": "models_update", "data": models})
-        
-        # Keep connection alive and send periodic updates
-        while True:
-            # Send system status every 5 seconds
+        try:
             system_status = await get_system_status()
             await websocket.send_json({"type": "system_update", "data": system_status})
             
-            # Send service status every 10 seconds
-            if int(asyncio.get_event_loop().time()) % 10 == 0:
-                services = await list_services()
-                await websocket.send_json({"type": "services_update", "data": services})
+            services = await list_services() 
+            await websocket.send_json({"type": "services_update", "data": services})
             
-            await asyncio.sleep(5)
+            models = await get_models()
+            await websocket.send_json({"type": "models_update", "data": models})
+        except Exception as e:
+            print(f"Error sending initial WebSocket data: {e}")
+            return
+        
+        # Keep connection alive and send periodic updates
+        while True:
+            try:
+                # Send system status every 5 seconds
+                system_status = await get_system_status()
+                await websocket.send_json({"type": "system_update", "data": system_status})
+                
+                # Send service status every 10 seconds
+                if int(asyncio.get_event_loop().time()) % 10 == 0:
+                    services = await list_services()
+                    await websocket.send_json({"type": "services_update", "data": services})
+                
+                await asyncio.sleep(5)
+            except WebSocketDisconnect:
+                print("WebSocket client disconnected")
+                break
+            except Exception as e:
+                print(f"WebSocket send error: {e}")
+                break
+    except WebSocketDisconnect:
+        print("WebSocket disconnected during setup")
     except Exception as e:
         print(f"WebSocket error: {e}")
-    finally:
-        await websocket.close()
 
 # Helper functions
 def calculate_cpu_percent(stats):
