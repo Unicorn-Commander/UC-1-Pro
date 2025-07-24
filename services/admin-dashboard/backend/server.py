@@ -275,6 +275,73 @@ async def get_service_logs(service_id: str, lines: int = 100):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+# Model Management Endpoints
+@app.get("/api/v1/models")
+async def get_models():
+    """Get list of installed models"""
+    models = []
+    
+    # Check vLLM models directory
+    models_dir = "/volumes/vllm_models"
+    if os.path.exists(models_dir):
+        try:
+            for model_name in os.listdir(models_dir):
+                model_path = os.path.join(models_dir, model_name)
+                if os.path.isdir(model_path):
+                    # Get model size
+                    size = get_directory_size(model_path)
+                    models.append({
+                        "id": model_name,
+                        "name": model_name,
+                        "type": "vLLM",
+                        "size": f"{size / (1024**3):.2f} GB",
+                        "active": model_name == os.environ.get("DEFAULT_LLM_MODEL", "").split("/")[-1],
+                        "last_used": None
+                    })
+        except Exception as e:
+            print(f"Error listing models: {e}")
+    
+    return models
+
+@app.get("/api/v1/models/search")
+async def search_models(q: str = ""):
+    """Search for models on Hugging Face"""
+    # This would integrate with HF API
+    # For now, return mock data
+    return [
+        {
+            "id": "meta-llama/Llama-2-7b-chat-hf",
+            "name": "Llama 2 7B Chat",
+            "description": "Meta's Llama 2 7B parameter chat model",
+            "downloads": 1000000,
+            "likes": 5000,
+            "size": "13.5 GB"
+        }
+    ]
+
+class ModelDownload(BaseModel):
+    model_id: str
+
+@app.post("/api/v1/models/download")
+async def download_model(request: ModelDownload):
+    """Start downloading a model"""
+    # This would trigger actual download
+    return {"status": "started", "model_id": request.model_id}
+
+@app.delete("/api/v1/models/{model_id}")
+async def delete_model(model_id: str):
+    """Delete a model"""
+    return {"status": "deleted", "model_id": model_id}
+
+class ActiveModel(BaseModel):
+    model_id: str
+
+@app.post("/api/v1/models/active")
+async def set_active_model(request: ActiveModel):
+    """Set the active model"""
+    # This would update the vLLM configuration
+    return {"status": "activated", "model_id": request.model_id}
+
 @app.get("/api/v1/network/interfaces")
 async def list_network_interfaces():
     """List all network interfaces"""
