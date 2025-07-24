@@ -8,6 +8,7 @@ import asyncio
 import json
 import os
 import subprocess
+import time
 from datetime import datetime
 from typing import Dict, List, Optional
 import GPUtil
@@ -38,37 +39,43 @@ SERVICES = {
         "container": "unicorn-open-webui",
         "name": "Chat UI",
         "port": 8080,
-        "healthcheck": "/health"
+        "healthcheck": "/health",
+        "description": "Web interface for AI chat interactions"
     },
     "vllm": {
         "container": "unicorn-vllm",
         "name": "vLLM API",
         "port": 8000,
-        "healthcheck": "/health"
+        "healthcheck": "/health",
+        "description": "High-performance LLM inference server"
     },
     "whisperx": {
         "container": "unicorn-whisperx",
         "name": "WhisperX",
         "port": 9000,
-        "healthcheck": "/health"
+        "healthcheck": "/health",
+        "description": "Advanced speech-to-text with speaker diarization"
     },
     "kokoro": {
         "container": "unicorn-kokoro",
         "name": "Kokoro TTS",
         "port": 8880,
-        "healthcheck": "/health"
+        "healthcheck": "/health",
+        "description": "High-quality text-to-speech synthesis"
     },
     "embeddings": {
         "container": "unicorn-embeddings",
         "name": "Embeddings",
         "port": 8082,
-        "healthcheck": "/health"
+        "healthcheck": "/health",
+        "description": "Text embedding service for RAG"
     },
     "reranker": {
         "container": "unicorn-reranker",
         "name": "Reranker",
         "port": 8083,
-        "healthcheck": "/health"
+        "healthcheck": "/health",
+        "description": "Document reranking for improved search"
     },
     "searxng": {
         "container": "unicorn-searxng",
@@ -120,38 +127,70 @@ async def get_system_status():
         disk = psutil.disk_usage('/')
         
         # GPU info (if available)
-        gpu_info = {"usage": 0, "memory": {"used": 0, "total": 0}, "temperature": 0}
+        gpu_info = []
         try:
             gpus = GPUtil.getGPUs()
-            if gpus:
-                gpu = gpus[0]  # Primary GPU
-                gpu_info = {
-                    "usage": round(gpu.load * 100, 1),
-                    "memory": {
-                        "used": round(gpu.memoryUsed / 1024, 1),
-                        "total": round(gpu.memoryTotal / 1024, 1)
-                    },
-                    "temperature": gpu.temperature
-                }
-        except:
-            pass
+            for gpu in gpus:
+                gpu_info.append({
+                    "name": gpu.name,
+                    "utilization": round(gpu.load * 100, 1),
+                    "memory_used": int(gpu.memoryUsed * 1024 * 1024),  # Convert to bytes
+                    "memory_total": int(gpu.memoryTotal * 1024 * 1024),  # Convert to bytes
+                    "temperature": gpu.temperature,
+                    "power_draw": getattr(gpu, 'powerDraw', 0),
+                    "power_limit": getattr(gpu, 'powerLimit', 0)
+                })
+        except Exception as e:
+            print(f"GPU info error: {e}")
+        
+        # Get CPU frequency
+        cpu_freq = psutil.cpu_freq()
+        
+        # Get load average
+        load_avg = os.getloadavg()
+        
+        # Get uptime
+        boot_time = psutil.boot_time()
+        uptime = int(time.time() - boot_time)
+        
+        # Get top processes
+        processes = []
+        for proc in psutil.process_iter(['pid', 'name', 'cpu_percent', 'memory_info', 'status']):
+            try:
+                proc_info = proc.info
+                if proc_info['cpu_percent'] > 0.1:  # Only show processes using CPU
+                    processes.append({
+                        "name": proc_info['name'],
+                        "cpu_percent": proc_info['cpu_percent'],
+                        "memory_mb": proc_info['memory_info'].rss / (1024 * 1024),
+                        "status": proc_info['status']
+                    })
+            except:
+                pass
+        
+        # Sort by CPU usage and take top 10
+        processes = sorted(processes, key=lambda x: x['cpu_percent'], reverse=True)[:10]
         
         return {
             "cpu": {
-                "usage": round(cpu_percent, 1),
-                "cores": cpu_count
+                "percent": round(cpu_percent, 1),
+                "cores": cpu_count,
+                "freq_current": int(cpu_freq.current) if cpu_freq else 0
             },
             "memory": {
-                "used": round(memory.used / (1024**3), 1),
-                "total": round(memory.total / (1024**3), 1),
+                "used": memory.used,
+                "total": memory.total,
                 "percent": round(memory.percent, 1)
             },
             "disk": {
-                "used": round(disk.used / (1024**3), 1),
-                "total": round(disk.total / (1024**3), 1),
+                "used": disk.used,
+                "total": disk.total,
                 "percent": round(disk.percent, 1)
             },
-            "gpu": gpu_info
+            "gpu": gpu_info,
+            "uptime": uptime,
+            "load_average": list(load_avg),
+            "processes": processes
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -187,16 +226,48 @@ async def list_services():
                     else:
                         status = "stopped"
                 
-                services.append({
-                    "id": service_id,
-                    "name": service_info["name"],
+                service_data = {
+                    "name": service_id,
+                    "display_name": service_info["name"],
                     "status": status,
-                    "port": service_info["port"]
-                })
+                    "port": service_info["port"],
+                    "description": service_info.get("description", ""),
+                    "cpu_percent": 0.0,
+                    "memory_mb": 0,
+                    "uptime": None,
+                    "health_check": None
+                }
+                
+                # Get container stats if running
+                if container_name in container_map and container_map[container_name].status == "running":
+                    try:
+                        container = container_map[container_name]
+                        stats = container.stats(stream=False)
+                        
+                        # Calculate CPU percentage
+                        cpu_delta = stats["cpu_stats"]["cpu_usage"]["total_usage"] - stats["precpu_stats"]["cpu_usage"]["total_usage"]
+                        system_delta = stats["cpu_stats"]["system_cpu_usage"] - stats["precpu_stats"]["system_cpu_usage"]
+                        if system_delta > 0:
+                            service_data["cpu_percent"] = (cpu_delta / system_delta) * 100.0
+                        
+                        # Memory usage
+                        service_data["memory_mb"] = stats["memory_stats"]["usage"] / (1024 * 1024)
+                        
+                        # Uptime
+                        started_at = container.attrs['State']['StartedAt']
+                        if started_at:
+                            from dateutil import parser
+                            start_time = parser.isoparse(started_at)
+                            uptime_seconds = (datetime.now(start_time.tzinfo) - start_time).total_seconds()
+                            service_data["uptime"] = f"{int(uptime_seconds // 3600)}h {int((uptime_seconds % 3600) // 60)}m"
+                    except Exception as e:
+                        print(f"Error getting stats for {container_name}: {e}")
+                
+                services.append(service_data)
         except Exception as e:
             print(f"Error listing services: {e}")
     
-    return {"services": services}
+    return services
 
 @app.get("/api/v1/services/{service_id}")
 async def get_service_details(service_id: str):
@@ -231,26 +302,60 @@ async def get_service_details(service_id: str):
     
     return details
 
-@app.post("/api/v1/services/{service_id}/action")
-async def service_action(service_id: str, action: ServiceAction):
+@app.post("/api/v1/services/{service_id}/{action}")
+async def service_action(service_id: str, action: str):
     """Start, stop, or restart a service"""
     if service_id not in SERVICES:
         raise HTTPException(status_code=404, detail="Service not found")
     
+    if action not in ["start", "stop", "restart"]:
+        raise HTTPException(status_code=400, detail="Invalid action")
+    
     service_info = SERVICES[service_id]
+    container_name = service_info["container"]
     
     try:
-        if action.action == "restart":
-            subprocess.run(["docker", "compose", "restart", service_info["container"]], check=True)
-        elif action.action == "stop":
-            subprocess.run(["docker", "compose", "stop", service_info["container"]], check=True)
-        elif action.action == "start":
-            subprocess.run(["docker", "compose", "start", service_info["container"]], check=True)
-        else:
-            raise HTTPException(status_code=400, detail="Invalid action")
+        # Change to the UC-1-Pro directory where docker-compose.yml is located
+        # Try to find the correct path
+        uc1_dir = None
+        for possible_path in ["/home/ucadmin/UC-1-Pro", "/app/UC-1-Pro", os.path.dirname(os.path.dirname(os.path.abspath(__file__)))]:
+            if os.path.exists(os.path.join(possible_path, "docker-compose.yml")):
+                uc1_dir = possible_path
+                break
         
-        return {"status": "success", "message": f"Service {action.action} completed"}
-    except subprocess.CalledProcessError as e:
+        if not uc1_dir:
+            raise HTTPException(status_code=500, detail="Could not find UC-1-Pro directory")
+        
+        if action == "restart":
+            result = subprocess.run(
+                ["docker", "compose", "restart", container_name],
+                cwd=uc1_dir,
+                capture_output=True,
+                text=True
+            )
+        elif action == "stop":
+            result = subprocess.run(
+                ["docker", "compose", "stop", container_name],
+                cwd=uc1_dir,
+                capture_output=True,
+                text=True
+            )
+        elif action == "start":
+            result = subprocess.run(
+                ["docker", "compose", "start", container_name],
+                cwd=uc1_dir,
+                capture_output=True,
+                text=True
+            )
+        
+        if result.returncode != 0:
+            raise HTTPException(
+                status_code=500,
+                detail=f"Failed to {action} service: {result.stderr}"
+            )
+        
+        return {"status": "success", "message": f"Service {action} completed"}
+    except Exception as e:
         raise HTTPException(status_code=500, detail=f"Action failed: {e}")
 
 @app.get("/api/v1/services/{service_id}/logs")
@@ -342,6 +447,123 @@ async def set_active_model(request: ActiveModel):
     # This would update the vLLM configuration
     return {"status": "activated", "model_id": request.model_id}
 
+@app.get("/api/v1/network/status")
+async def get_network_status():
+    """Get current network connection status"""
+    status = {
+        "ethernet": {
+            "connected": False,
+            "ip_address": None,
+            "speed": None
+        },
+        "wifi": {
+            "connected": False,
+            "ssid": None,
+            "ip_address": None,
+            "signal_strength": None
+        },
+        "bluetooth": {
+            "enabled": False,
+            "devices": []
+        }
+    }
+    
+    # Get network interfaces
+    interfaces = psutil.net_if_addrs()
+    stats = psutil.net_if_stats()
+    
+    # Check ethernet (typically eth0 or enp*)
+    for iface in interfaces:
+        if iface.startswith(('eth', 'enp')):
+            if iface in stats and stats[iface].isup:
+                status["ethernet"]["connected"] = True
+                # Get IP address
+                for addr in interfaces[iface]:
+                    if addr.family == 2:  # AF_INET (IPv4)
+                        status["ethernet"]["ip_address"] = addr.address
+                # Get speed if available
+                if hasattr(stats[iface], 'speed'):
+                    status["ethernet"]["speed"] = stats[iface].speed
+    
+    # Check WiFi (typically wlan0 or wlp*)
+    for iface in interfaces:
+        if iface.startswith(('wlan', 'wlp')):
+            if iface in stats and stats[iface].isup:
+                status["wifi"]["connected"] = True
+                # Get IP address
+                for addr in interfaces[iface]:
+                    if addr.family == 2:  # AF_INET (IPv4)
+                        status["wifi"]["ip_address"] = addr.address
+                
+                # Try to get WiFi details
+                try:
+                    # This would use nmcli or iwconfig on Linux
+                    result = subprocess.run(['iwconfig', iface], capture_output=True, text=True)
+                    if result.returncode == 0:
+                        output = result.stdout
+                        # Parse SSID
+                        if 'ESSID:' in output:
+                            ssid = output.split('ESSID:')[1].split('"')[1]
+                            status["wifi"]["ssid"] = ssid
+                        # Parse signal strength
+                        if 'Signal level=' in output:
+                            signal = output.split('Signal level=')[1].split(' ')[0]
+                            status["wifi"]["signal_strength"] = int(signal)
+                except:
+                    pass
+    
+    return status
+
+@app.get("/api/v1/network/wifi/scan")
+async def scan_wifi_networks():
+    """Scan for available WiFi networks"""
+    networks = []
+    
+    try:
+        # Use nmcli to scan for WiFi networks
+        result = subprocess.run(
+            ['nmcli', '-t', '-f', 'SSID,SIGNAL,SECURITY', 'dev', 'wifi'],
+            capture_output=True,
+            text=True
+        )
+        
+        if result.returncode == 0:
+            for line in result.stdout.strip().split('\n'):
+                if line:
+                    parts = line.split(':')
+                    if len(parts) >= 3:
+                        networks.append({
+                            "ssid": parts[0],
+                            "signal_strength": int(parts[1]) if parts[1] else 0,
+                            "security": parts[2] != '--'
+                        })
+    except Exception as e:
+        print(f"WiFi scan error: {e}")
+    
+    return networks
+
+class WiFiConnect(BaseModel):
+    ssid: str
+    password: str
+
+@app.post("/api/v1/network/wifi/connect")
+async def connect_to_wifi(request: WiFiConnect):
+    """Connect to a WiFi network"""
+    try:
+        # Use nmcli to connect
+        result = subprocess.run(
+            ['nmcli', 'dev', 'wifi', 'connect', request.ssid, 'password', request.password],
+            capture_output=True,
+            text=True
+        )
+        
+        if result.returncode == 0:
+            return {"status": "connected", "message": f"Connected to {request.ssid}"}
+        else:
+            raise HTTPException(status_code=400, detail=f"Failed to connect: {result.stderr}")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 @app.get("/api/v1/network/interfaces")
 async def list_network_interfaces():
     """List all network interfaces"""
@@ -431,10 +653,27 @@ async def update_settings(settings: SystemSettings):
 async def websocket_endpoint(websocket: WebSocket):
     await websocket.accept()
     try:
+        # Send initial data
+        system_status = await get_system_status()
+        await websocket.send_json({"type": "system_update", "data": system_status})
+        
+        services = await list_services()
+        await websocket.send_json({"type": "services_update", "data": services})
+        
+        models = await get_models()
+        await websocket.send_json({"type": "models_update", "data": models})
+        
+        # Keep connection alive and send periodic updates
         while True:
             # Send system status every 5 seconds
-            status = await get_system_status()
-            await websocket.send_json({"type": "status", "data": status})
+            system_status = await get_system_status()
+            await websocket.send_json({"type": "system_update", "data": system_status})
+            
+            # Send service status every 10 seconds
+            if int(asyncio.get_event_loop().time()) % 10 == 0:
+                services = await list_services()
+                await websocket.send_json({"type": "services_update", "data": services})
+            
             await asyncio.sleep(5)
     except Exception as e:
         print(f"WebSocket error: {e}")
