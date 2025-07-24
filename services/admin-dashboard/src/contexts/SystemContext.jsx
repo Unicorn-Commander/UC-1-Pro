@@ -31,12 +31,13 @@ export function SystemProvider({ children }) {
     let reconnectInterval;
 
     const connect = () => {
-      ws = new WebSocket(`ws://${window.location.host}/ws`);
+      try {
+        ws = new WebSocket(`ws://${window.location.host}/ws`);
 
-      ws.onopen = () => {
-        console.log('WebSocket connected');
-        setWsConnected(true);
-      };
+        ws.onopen = () => {
+          console.log('WebSocket connected');
+          setWsConnected(true);
+        };
 
       ws.onmessage = (event) => {
         const data = JSON.parse(event.data);
@@ -53,6 +54,10 @@ export function SystemProvider({ children }) {
       ws.onerror = (error) => {
         console.error('WebSocket error:', error);
       };
+      } catch (error) {
+        console.error('WebSocket connection failed:', error);
+        setWsConnected(false);
+      }
     };
 
     connect();
@@ -90,7 +95,9 @@ export function SystemProvider({ children }) {
       const data = await response.json();
       setSystemStatus(data);
     } catch (err) {
+      console.error('System status fetch error:', err);
       setError(err.message);
+      setLoading(false);
     }
   };
 
