@@ -57,12 +57,17 @@ export function ThemeProvider({ children }) {
   useEffect(() => {
     // Apply theme to document
     const theme = themes[currentTheme];
-    document.documentElement.className = isDarkMode ? 'dark' : '';
+    
+    // For light theme, ensure dark mode is off
+    if (currentTheme === 'light') {
+      document.documentElement.classList.remove('dark');
+    } else {
+      document.documentElement.classList.add('dark');
+    }
     
     // Store theme preference
     localStorage.setItem('uc1-theme', currentTheme);
-    localStorage.setItem('uc1-dark-mode', isDarkMode);
-  }, [currentTheme, isDarkMode]);
+  }, [currentTheme]);
 
   useEffect(() => {
     // Load saved theme

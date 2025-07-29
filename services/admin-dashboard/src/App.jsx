@@ -1,19 +1,100 @@
 import React, { useState, useEffect } from 'react';
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, useLocation, Navigate } from 'react-router-dom';
 import Dashboard from './pages/Dashboard';
-import Models from './pages/Models';
+import AIModelManagement from './pages/AIModelManagement';
 import Services from './pages/Services';
 import System from './pages/System';
 import Network from './pages/Network';
 import Settings from './pages/Settings';
+import StorageBackup from './pages/StorageBackup';
+import Extensions from './pages/Extensions';
+import Logs from './pages/Logs';
+import Security from './pages/Security';
+import Login from './pages/Login';
 import Layout from './components/Layout';
 import ErrorBoundary from './components/ErrorBoundary';
 import LoadingScreen from './components/LoadingScreen';
+import OnboardingTour from './components/OnboardingTour';
+import HelpPanel from './components/HelpPanel';
 import { SystemProvider, useSystem } from './contexts/SystemContext';
 import { ThemeProvider } from './contexts/ThemeContext';
 
+// Protected Route wrapper
+function ProtectedRoute({ children }) {
+  const token = localStorage.getItem('authToken');
+  
+  if (!token) {
+    return <Navigate to="/login" replace />;
+  }
+  
+  return children;
+}
+
+function AppRoutes() {
+  const location = useLocation();
+  const [showHelp, setShowHelp] = useState(false);
+  
+  // Keyboard shortcut for help
+  useEffect(() => {
+    const handleKeyPress = (e) => {
+      if (e.key === '?' && !e.target.matches('input, textarea, select')) {
+        setShowHelp(!showHelp);
+      }
+    };
+    
+    window.addEventListener('keydown', handleKeyPress);
+    return () => window.removeEventListener('keydown', handleKeyPress);
+  }, [showHelp]);
+  
+  const getCurrentPage = () => {
+    const path = location.pathname.slice(1);
+    return path || 'dashboard';
+  };
+  
+  return (
+    <>
+      <Routes>
+        <Route path="/login" element={<Login />} />
+        <Route path="/*" element={
+          <ProtectedRoute>
+            <Layout>
+              <Routes>
+                <Route path="/" element={<Dashboard />} />
+                <Route path="/models" element={<AIModelManagement />} />
+                <Route path="/services" element={<Services />} />
+                <Route path="/system" element={<System />} />
+                <Route path="/network" element={<Network />} />
+                <Route path="/storage" element={<StorageBackup />} />
+                <Route path="/extensions" element={<Extensions />} />
+                <Route path="/logs" element={<Logs />} />
+                <Route path="/security" element={<Security />} />
+                <Route path="/settings" element={<Settings />} />
+              </Routes>
+            </Layout>
+          </ProtectedRoute>
+        } />
+      </Routes>
+      
+      <HelpPanel 
+        isOpen={showHelp} 
+        onClose={() => setShowHelp(false)}
+        currentPage={getCurrentPage()}
+      />
+    </>
+  );
+}
+
 function AppContent() {
   const { loading, error } = useSystem();
+  const [showOnboarding, setShowOnboarding] = useState(false);
+  
+  useEffect(() => {
+    // Check if user needs onboarding
+    const hasCompletedTour = localStorage.getItem('uc1-tour-completed');
+    if (!hasCompletedTour && !loading && !error) {
+      setTimeout(() => setShowOnboarding(true), 1000);
+    }
+  }, [loading, error]);
   
   if (loading) {
     return <LoadingScreen />;
@@ -33,16 +114,10 @@ function AppContent() {
   
   return (
     <Router>
-      <Layout>
-        <Routes>
-          <Route path="/" element={<Dashboard />} />
-          <Route path="/models" element={<Models />} />
-          <Route path="/services" element={<Services />} />
-          <Route path="/system" element={<System />} />
-          <Route path="/network" element={<Network />} />
-          <Route path="/settings" element={<Settings />} />
-        </Routes>
-      </Layout>
+      <AppRoutes />
+      {showOnboarding && (
+        <OnboardingTour onComplete={() => setShowOnboarding(false)} />
+      )}
     </Router>
   );
 }

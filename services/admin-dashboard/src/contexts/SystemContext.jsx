@@ -14,6 +14,7 @@ export function SystemProvider({ children }) {
   const [systemStatus, setSystemStatus] = useState(null);
   const [services, setServices] = useState([]);
   const [models, setModels] = useState([]);
+  const [activeModel, setActiveModel] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [wsConnected, setWsConnected] = useState(false);
@@ -91,9 +92,13 @@ export function SystemProvider({ children }) {
   const fetchSystemStatus = async () => {
     try {
       const response = await fetch('/api/v1/system/status');
-      if (!response.ok) throw new Error('Failed to fetch system status');
+      if (!response.ok) {
+        const text = await response.text();
+        throw new Error(`Failed to fetch system status: ${response.status} - ${text}`);
+      }
       const data = await response.json();
       setSystemStatus(data);
+      setError(null); // Clear any previous errors
     } catch (err) {
       console.error('System status fetch error:', err);
       setError(err.message);
@@ -125,10 +130,14 @@ export function SystemProvider({ children }) {
     }
   };
 
-  const controlService = async (serviceName, action) => {
+  const controlService = async (containerName, action) => {
     try {
-      const response = await fetch(`/api/v1/services/${serviceName}/${action}`, {
+      const response = await fetch(`/api/v1/services/${containerName}/action`, {
         method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ action }),
       });
       if (!response.ok) throw new Error(`Failed to ${action} service`);
       const data = await response.json();
@@ -144,6 +153,8 @@ export function SystemProvider({ children }) {
     systemStatus,
     services,
     models,
+    activeModel,
+    setActiveModel,
     loading,
     error,
     wsConnected,

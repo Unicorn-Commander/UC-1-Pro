@@ -6,7 +6,11 @@ import {
   SignalIcon,
   LockClosedIcon,
   CheckCircleIcon,
-  XCircleIcon
+  XCircleIcon,
+  ArrowPathIcon,
+  CogIcon,
+  PencilIcon,
+  ExclamationTriangleIcon
 } from '@heroicons/react/24/outline';
 
 export default function Network() {
@@ -16,6 +20,16 @@ export default function Network() {
   const [selectedNetwork, setSelectedNetwork] = useState(null);
   const [wifiPassword, setWifiPassword] = useState('');
   const [connecting, setConnecting] = useState(false);
+  const [scanning, setScanning] = useState(false);
+  const [showNetworkConfig, setShowNetworkConfig] = useState(false);
+  const [networkConfig, setNetworkConfig] = useState({
+    method: 'dhcp',
+    address: '',
+    netmask: '255.255.255.0',
+    gateway: '',
+    dns1: '',
+    dns2: ''
+  });
 
   useEffect(() => {
     fetchNetworkStatus();
@@ -36,6 +50,7 @@ export default function Network() {
   };
 
   const scanWifiNetworks = async () => {
+    setScanning(true);
     try {
       const response = await fetch('/api/v1/network/wifi/scan');
       if (!response.ok) throw new Error('Failed to scan WiFi networks');
@@ -43,11 +58,21 @@ export default function Network() {
       setWifiNetworks(data);
     } catch (error) {
       console.error('WiFi scan error:', error);
+      // Show user-friendly error
+      alert('Failed to scan WiFi networks. Make sure WiFi is enabled.');
+    } finally {
+      setScanning(false);
     }
   };
 
   const connectToWifi = async () => {
-    if (!selectedNetwork || !wifiPassword) return;
+    if (!selectedNetwork) return;
+    
+    // Check if password is required
+    if (selectedNetwork.security !== 'Open' && !wifiPassword) {
+      alert('Please enter the WiFi password');
+      return;
+    }
     
     setConnecting(true);
     try {
@@ -59,21 +84,30 @@ export default function Network() {
           password: wifiPassword,
         }),
       });
-      if (!response.ok) throw new Error('Failed to connect to WiFi');
+      
+      const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.detail || 'Failed to connect to WiFi');
+      }
+      
       await fetchNetworkStatus();
       setSelectedNetwork(null);
       setWifiPassword('');
+      alert('Successfully connected to WiFi!');
     } catch (error) {
       console.error('WiFi connection error:', error);
+      alert(error.message || 'Failed to connect to WiFi. Please check your password.');
     } finally {
       setConnecting(false);
     }
   };
 
   const getSignalStrength = (strength) => {
-    if (strength > -50) return 'Excellent';
-    if (strength > -60) return 'Good';
-    if (strength > -70) return 'Fair';
+    // WiFi signal strength is typically 0-100 in nmcli
+    if (strength > 75) return 'Excellent';
+    if (strength > 50) return 'Good';
+    if (strength > 25) return 'Fair';
     return 'Poor';
   };
 
@@ -84,6 +118,28 @@ export default function Network() {
                   quality === 'Fair' ? 'text-orange-600' : 'text-red-600';
     
     return <SignalIcon className={`h-5 w-5 ${color}`} />;
+  };
+
+  const disconnectWifi = async () => {
+    try {
+      const response = await fetch('/api/v1/network/wifi/disconnect', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      });
+      
+      const data = await response.json();
+      
+      if (response.ok) {
+        alert('WiFi disconnected');
+        await fetchNetworkStatus();
+        await scanWifiNetworks();
+      } else {
+        alert(data.detail || 'Failed to disconnect WiFi');
+      }
+    } catch (error) {
+      console.error('WiFi disconnect error:', error);
+      alert('Failed to disconnect WiFi');
+    }
   };
 
   if (loading) {
@@ -100,6 +156,7 @@ export default function Network() {
           Manage network connections and settings
         </p>
       </div>
+
 
       {/* Current Network Status */}
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
@@ -171,9 +228,25 @@ export default function Network() {
                 <div className="flex justify-between">
                   <span className="text-gray-600 dark:text-gray-400">Signal:</span>
                   <span className="text-gray-900 dark:text-white flex items-center gap-2">
-                    {getSignalIcon(networkStatus.wifi.signal_strength)}
-                    {getSignalStrength(networkStatus.wifi.signal_strength)}
+                    {getSignalIcon(networkStatus.wifi.signal)}
+                    {getSignalStrength(networkStatus.wifi.signal)}
                   </span>
+                </div>
+                {networkStatus.wifi.ip && (
+                  <div className="flex justify-between">
+                    <span className="text-gray-600 dark:text-gray-400">IP:</span>
+                    <span className="text-gray-900 dark:text-white font-mono">
+                      {networkStatus.wifi.ip}
+                    </span>
+                  </div>
+                )}
+                <div className="mt-3">
+                  <button
+                    onClick={disconnectWifi}
+                    className="w-full px-3 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 text-sm"
+                  >
+                    Disconnect
+                  </button>
                 </div>
               </div>
             ) : (
@@ -189,15 +262,40 @@ export default function Network() {
           <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
             Available WiFi Networks
           </h2>
-          <button
-            onClick={scanWifiNetworks}
-            className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700"
-          >
-            Scan Networks
-          </button>
+          <div className="flex gap-2">
+            <button
+              onClick={() => setShowNetworkConfig(true)}
+              className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 flex items-center gap-2"
+              title="Configure network settings"
+            >
+              <CogIcon className="h-5 w-5" />
+              Configure
+            </button>
+            <button
+              onClick={scanWifiNetworks}
+              disabled={scanning}
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center gap-2"
+            >
+              <ArrowPathIcon className={`h-5 w-5 ${scanning ? 'animate-spin' : ''}`} />
+              {scanning ? 'Scanning...' : 'Scan Networks'}
+            </button>
+          </div>
         </div>
 
         <div className="space-y-3">
+          {scanning && wifiNetworks.length === 0 && (
+            <div className="text-center py-8 text-gray-500">
+              <ArrowPathIcon className="h-8 w-8 animate-spin mx-auto mb-2" />
+              Scanning for WiFi networks...
+            </div>
+          )}
+          
+          {!scanning && wifiNetworks.length === 0 && (
+            <div className="text-center py-8 text-gray-500">
+              No WiFi networks found. Click "Scan Networks" to search.
+            </div>
+          )}
+          
           {wifiNetworks.map((network, index) => (
             <motion.div
               key={network.ssid}
@@ -206,8 +304,8 @@ export default function Network() {
               transition={{ delay: index * 0.05 }}
               className={`
                 border dark:border-gray-700 rounded-lg p-4 cursor-pointer
-                ${selectedNetwork?.ssid === network.ssid ? 'border-primary-500' : ''}
-                hover:border-primary-400 transition-colors
+                ${selectedNetwork?.ssid === network.ssid ? 'border-blue-500' : ''}
+                hover:border-blue-400 transition-colors
               `}
               onClick={() => setSelectedNetwork(network)}
             >
@@ -250,7 +348,7 @@ export default function Network() {
               <button
                 onClick={connectToWifi}
                 disabled={!wifiPassword || connecting}
-                className="px-6 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50"
+                className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
               >
                 {connecting ? 'Connecting...' : 'Connect'}
               </button>
@@ -295,6 +393,131 @@ export default function Network() {
           </button>
         </div>
       </div>
+
+      {/* Network Configuration Modal */}
+      {showNetworkConfig && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-md w-full">
+            <h3 className="text-lg font-semibold mb-4">Network Configuration</h3>
+            
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium mb-2">Configuration Method</label>
+                <select
+                  value={networkConfig.method}
+                  onChange={(e) => setNetworkConfig({...networkConfig, method: e.target.value})}
+                  className="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600"
+                >
+                  <option value="dhcp">DHCP (Automatic)</option>
+                  <option value="static">Static IP</option>
+                </select>
+              </div>
+              
+              {networkConfig.method === 'static' && (
+                <>
+                  <div>
+                    <label className="block text-sm font-medium mb-2">IP Address</label>
+                    <input
+                      type="text"
+                      value={networkConfig.address}
+                      onChange={(e) => setNetworkConfig({...networkConfig, address: e.target.value})}
+                      placeholder="192.168.1.100"
+                      className="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-2">Subnet Mask</label>
+                    <input
+                      type="text"
+                      value={networkConfig.netmask}
+                      onChange={(e) => setNetworkConfig({...networkConfig, netmask: e.target.value})}
+                      placeholder="255.255.255.0"
+                      className="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-2">Gateway</label>
+                    <input
+                      type="text"
+                      value={networkConfig.gateway}
+                      onChange={(e) => setNetworkConfig({...networkConfig, gateway: e.target.value})}
+                      placeholder="192.168.1.1"
+                      className="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-2">Primary DNS</label>
+                    <input
+                      type="text"
+                      value={networkConfig.dns1}
+                      onChange={(e) => setNetworkConfig({...networkConfig, dns1: e.target.value})}
+                      placeholder="8.8.8.8"
+                      className="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-2">Secondary DNS</label>
+                    <input
+                      type="text"
+                      value={networkConfig.dns2}
+                      onChange={(e) => setNetworkConfig({...networkConfig, dns2: e.target.value})}
+                      placeholder="8.8.4.4"
+                      className="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600"
+                    />
+                  </div>
+                </>
+              )}
+            </div>
+            
+            <div className="flex justify-end gap-3 mt-6">
+              <button
+                onClick={() => setShowNetworkConfig(false)}
+                className="px-4 py-2 text-gray-600 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={async () => {
+                  // Apply network configuration
+                  try {
+                    // Get the interface name based on what's being configured
+                    const interfaceName = networkStatus?.ethernet?.interface || 'eth0';
+                    const configData = {
+                      interface: interfaceName,
+                      method: networkConfig.method,
+                      address: networkConfig.address,
+                      netmask: networkConfig.netmask,
+                      gateway: networkConfig.gateway,
+                      dns: [networkConfig.dns1, networkConfig.dns2].filter(Boolean)
+                    };
+                    
+                    const response = await fetch('/api/v1/network/configure', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify(configData)
+                    });
+                    
+                    const data = await response.json();
+                    
+                    if (response.ok) {
+                      alert('Network configuration applied successfully!');
+                      setShowNetworkConfig(false);
+                      fetchNetworkStatus();
+                    } else {
+                      throw new Error(data.detail || 'Failed to apply configuration');
+                    }
+                  } catch (error) {
+                    alert(error.message || 'Failed to apply network configuration');
+                  }
+                }}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+              >
+                Apply
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

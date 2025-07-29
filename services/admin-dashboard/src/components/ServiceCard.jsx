@@ -23,7 +23,9 @@ export default function ServiceCard({ service }) {
   const [isHovered, setIsHovered] = useState(false);
 
   const openService = () => {
-    window.open(service.url, '_blank');
+    if (service.url) {
+      window.open(service.url, '_blank');
+    }
   };
 
   const restartService = async (e) => {
@@ -44,11 +46,11 @@ export default function ServiceCard({ service }) {
 
   return (
     <motion.div
-      className="bg-white dark:bg-gray-800 rounded-xl shadow-lg overflow-hidden cursor-pointer transform transition-all duration-300 hover:scale-105"
+      className={`bg-white dark:bg-gray-800 rounded-xl shadow-lg overflow-hidden transform transition-all duration-300 hover:scale-105 ${service.url ? 'cursor-pointer' : ''}`}
       whileHover={{ y: -4 }}
       onHoverStart={() => setIsHovered(true)}
       onHoverEnd={() => setIsHovered(false)}
-      onClick={openService}
+      onClick={service.url ? openService : undefined}
     >
       <div className="p-6">
         {/* Header */}
@@ -81,12 +83,18 @@ export default function ServiceCard({ service }) {
 
         {/* Actions */}
         <div className="flex justify-between items-center">
-          <button
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium"
-            onClick={openService}
-          >
-            Open
-          </button>
+          {service.url ? (
+            <button
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium"
+              onClick={openService}
+            >
+              Open
+            </button>
+          ) : (
+            <span className="px-4 py-2 bg-gray-300 dark:bg-gray-600 text-gray-500 dark:text-gray-400 rounded-lg text-sm font-medium">
+              API Only
+            </span>
+          )}
           
           {isHovered && (
             <div className="flex gap-2">

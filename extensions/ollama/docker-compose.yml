@@ -1,0 +1,36 @@
+services:
+  ollama:
+    image: ollama/ollama:latest
+    container_name: unicorn-ollama
+    hostname: unicorn-ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_models:/root/.ollama
+      - /home/ucadmin/UC-1-Pro/volumes/ollama_models:/models
+    environment:
+      - OLLAMA_MODELS=/models
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=compute,utility
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    restart: unless-stopped
+    networks:
+      - unicorn-network
+    labels:
+      - "com.unicorn.service=ollama"
+      - "com.unicorn.description=Ollama Model Server with NVIDIA GPU Support"
+
+volumes:
+  ollama_models:
+    name: unicorn-ollama-models
+
+networks:
+  unicorn-network:
+    external: true
+    name: unicorn-network

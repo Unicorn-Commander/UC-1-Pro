@@ -1,0 +1,15 @@
+apiVersion: 1
+
+datasources:
+  - name: Prometheus
+    type: prometheus
+    access: proxy
+    url: http://uc1-prometheus:9090
+    isDefault: true
+    editable: true
+    
+  - name: UC1-Prometheus-Main
+    type: prometheus
+    access: proxy
+    url: http://unicorn-prometheus:9090
+    editable: true
