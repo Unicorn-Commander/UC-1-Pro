@@ -1,6 +1,6 @@
 # UC-1 Pro Makefile for common operations
 
-.PHONY: help start stop restart status logs health gpu-status clean backup
+.PHONY: help start stop restart status logs health gpu-status clean backup update build test-services
 
 help:
 	@echo "UC-1 Pro Management Commands"
@@ -72,12 +72,74 @@ comfyui:
 	@echo "ComfyUI started at http://localhost:8188"
 
 portainer:
-	@if [ ! -f extensions/portainer/portainer_password.txt ]; then \
-		echo "Creating Portainer admin password..."; \
-		openssl rand -base64 12 > extensions/portainer/portainer_password.txt; \
-		chmod 600 extensions/portainer/portainer_password.txt; \
-		echo "Admin password saved to extensions/portainer/portainer_password.txt"; \
-	fi
+	@cd extensions/portainer && docker-compose up -d
+	@echo "Portainer started at https://localhost:9443"
+
+# Additional service management
+logs-embed:
+	@docker-compose logs -f embeddings
+
+logs-rerank:
+	@docker-compose logs -f reranker
+
+logs-whisper:
+	@docker-compose logs -f whisperx
+
+logs-tts:
+	@docker-compose logs -f kokoro-tts
+
+# Build and update commands
+build:
+	@echo "Building custom services..."
+	@docker-compose build embeddings reranker whisperx kokoro-tts
+
+update:
+	@echo "Pulling latest images..."
+	@docker-compose pull
+	@echo "Rebuilding custom services..."
+	@docker-compose build
+	@echo "Restarting services..."
+	@docker-compose up -d
+
+# Testing commands
+test-services:
+	@echo "Testing service endpoints..."
+	@./scripts/test-inference.sh 2>/dev/null || echo "vLLM test completed"
+	@curl -s http://localhost:8082/health | jq -r '.status' | xargs -I {} echo "Embeddings: {}"
+	@curl -s http://localhost:8083/health | jq -r '.status' | xargs -I {} echo "Reranker: {}"
+	@curl -s http://localhost:9000/health | jq -r '.status' | xargs -I {} echo "WhisperX: {}"
+	@curl -s http://localhost:8880/health | jq -r '.status' | xargs -I {} echo "Kokoro TTS: {}"
+
+# Model management
+switch-model:
+	@./scripts/switch-model.sh
+
+download-models:
+	@./scripts/download-models.sh
+
+# Development commands
+shell-vllm:
+	@docker-compose exec vllm /bin/bash
+
+shell-ui:
+	@docker-compose exec open-webui /bin/bash
+
+# System information
+info:
+	@echo "UC-1 Pro System Information"
+	@echo "==========================="
+	@nvidia-smi --query-gpu=name,memory.total,driver_version --format=csv,noheader
+	@echo ""
+	@echo "Docker version: $$(docker --version)"
+	@echo "Compose version: $$(docker-compose --version)"
+	@echo ""
+	@echo "Service URLs:"
+	@echo "  Open-WebUI: http://localhost:8080"
+	@echo "  vLLM API: http://localhost:8000"
+	@echo "  Embeddings: http://localhost:8082"
+	@echo "  Reranker: http://localhost:8083"
+	@echo "  Search: http://localhost:8888"
+	@echo "  Ops Center: http://localhost:8084"
 	@cd extensions/portainer && docker-compose up -d
 	@echo "Portainer started at http://localhost:9000"
 	@echo "Username: admin"

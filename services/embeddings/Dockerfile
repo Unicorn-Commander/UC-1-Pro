@@ -20,7 +20,7 @@ RUN pip install --no-cache-dir --upgrade pip && \
 COPY server.py .
 
 # Expose port
-EXPOSE 8080
+EXPOSE 8082
 
 # Run the server
-CMD ["uvicorn", "server:app", "--host", "0.0.0.0", "--port", "8080", "--workers", "1"]
+CMD ["uvicorn", "server:app", "--host", "0.0.0.0", "--port", "8082", "--workers", "1"]
