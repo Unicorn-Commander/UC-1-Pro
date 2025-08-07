@@ -33,6 +33,67 @@ UC-1 Pro is a production-ready, modular AI infrastructure stack that unleashes t
 - **⚡ Smart Health Checks** - Accurate service status monitoring
 - **📥 Model Pre-download** - Optional script to download models before startup
 
+## 📸 Operations Center Dashboard
+
+UC-1 Pro includes a comprehensive web-based Operations Center for system administration and user access.
+
+### 🏠 Main Dashboard Views
+
+<div align="center">
+
+#### User Dashboard & Homepage
+<img src="services/ops-center/screenshots/User Dashboard-Homepage.png" alt="UC-1 Pro User Dashboard" width="700"/>
+<p><em>User-friendly interface with search capabilities and quick access to AI services</em></p>
+
+#### Admin Dashboard  
+<img src="services/ops-center/screenshots/admin dashboard.png" alt="UC-1 Pro Admin Dashboard" width="700"/>
+<p><em>Complete system oversight with real-time monitoring and service management</em></p>
+
+</div>
+
+### 🛠️ Management Features
+
+<div align="center">
+
+<table>
+<tr>
+<td width="33%" align="center">
+<img src="services/ops-center/screenshots/AI-Model-Management.png" alt="AI Model Management" width="300"/>
+<br><strong>🤖 AI Model Management</strong>
+<br>Search, download & manage LLM models
+</td>
+<td width="33%" align="center">
+<img src="services/ops-center/screenshots/Service Management.png" alt="Service Management" width="300"/>
+<br><strong>⚙️ Service Management</strong>  
+<br>Real-time service monitoring & control
+</td>
+<td width="33%" align="center">
+<img src="services/ops-center/screenshots/System Monitoring.png" alt="System Monitoring" width="300"/>
+<br><strong>📊 System Monitoring</strong>
+<br>GPU, CPU, memory & disk analytics
+</td>
+</tr>
+<tr>
+<td width="33%" align="center">
+<img src="services/ops-center/screenshots/Settings.png" alt="Settings" width="300"/>
+<br><strong>🔧 Settings & Config</strong>
+<br>System configuration & preferences
+</td>
+<td width="33%" align="center">
+<img src="services/ops-center/screenshots/Extensions.png" alt="Extensions" width="300"/>
+<br><strong>🧩 Extensions</strong>
+<br>One-click extension deployment
+</td>
+<td width="33%" align="center">
+<img src="services/ops-center/screenshots/AI-Model-Management.png" alt="Security Management" width="300"/>
+<br><strong>🔒 Security Center</strong>
+<br>User accounts & API management
+</td>
+</tr>
+</table>
+
+</div>
+
 ## 🚀 Quick Start
 
 ### Prerequisites
