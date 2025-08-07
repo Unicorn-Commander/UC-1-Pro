@@ -186,15 +186,16 @@ services:
     build: ./services/kokoro-tts
     container_name: unicorn-kokoro
     restart: unless-stopped
-    devices:
-      - /dev/dri:/dev/dri
-    group_add:
-      - video
     ports:
       - "8880:8880"
     environment:
-      DEVICE: "GPU"
+      DEVICE: "IGPU"  # Using Intel iGPU via OpenVINO
       DEFAULT_VOICE: "${KOKORO_VOICE:-af}"
+    devices:
+      - /dev/dri:/dev/dri
+    group_add:
+      - "44"    # video group
+      - "993"   # render group
     volumes:
       - ./volumes/kokoro_models:/app/models
     networks:
@@ -274,7 +275,7 @@ services:
       STT_OPENAI_API_KEY: "dummy-key"
       STT_MODEL: "whisper-1"
       SEARCH_ENGINE: "searxng"
-      SEARXNG_URL: "http://unicorn-searxng:8080"
+      SEARXNG_URL: "http://unicorn-searxng:8890"
       ENABLE_MODEL_FILTER: "false"
       MODEL_FILTER_LIST: ""
       ENABLE_OLLAMA_API: "false"
@@ -312,36 +313,36 @@ services:
           - tika
           - ocr
 
-  # --- Self-hosted Search: SearXNG ---
+  # --- Self-hosted Search: Center-Deep (Custom SearXNG) ---
   unicorn-searxng:
-    build: ./services/searxng
+    build: ./Center-Deep
     container_name: unicorn-searxng
     restart: unless-stopped
     volumes:
-      - ./services/searxng:/etc/searxng:rw
+      - ./Center-Deep/instance:/app/instance:rw
+      - /var/run/docker.sock:/var/run/docker.sock
     ports:
-      - "8888:8080"
+      - "8888:8890"
     networks:
       unicorn-network:
         aliases:
           - searxng
           - search
+          - center-deep
     environment:
-      - BIND_ADDRESS=0.0.0.0:8080
-      - INSTANCE_NAME=UnicornCommander
-      - SEARXNG_BASE_URL=http://localhost:8888/
-      - UWSGI_WORKERS=4
-      - UWSGI_THREADS=2
-      - SEARXNG_SECRET=${SEARXNG_SECRET}
-      - SEARXNG_REDIS_URL=redis://unicorn-redis:6379/2
-    cap_drop:
-      - ALL
-    cap_add:
-      - CHOWN
-      - SETGID
-      - SETUID
+      - FLASK_APP=app.py
+      - PYTHONUNBUFFERED=1
+      - ADMIN_USERNAME=${ADMIN_USERNAME:-ucadmin}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-MagicUnicorn!8-)}
+      - SECRET_KEY=${SEARXNG_SECRET}
+      - REDIS_URL=redis://unicorn-redis:6379/2
+      - LLM_ENDPOINT=${LLM_ENDPOINT:-http://unicorn-vllm:8000/v1}
+      - LLM_API_KEY=${VLLM_API_KEY:-dummy-key}
+      - LLM_MODEL=${DEFAULT_LLM_MODEL:-Qwen/Qwen2.5-32B-Instruct-AWQ}
     depends_on:
       redis:
+        condition: service_healthy
+      vllm:
         condition: service_healthy
 
   # --- GPU Monitoring ---
@@ -359,10 +360,10 @@ services:
         aliases:
           - gpu-metrics
 
-  # --- UC-1 Pro Admin Dashboard ---
-  admin-dashboard:
-    build: ./services/admin-dashboard
-    container_name: unicorn-admin
+  # --- UC-1 Pro Ops Center ---
+  ops-center:
+    build: ./services/ops-center
+    container_name: unicorn-ops-center
     restart: unless-stopped
     ports:
       - "8084:8084"
@@ -375,6 +376,7 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - ./volumes:/volumes:ro
+      - ./extensions:/home/ucadmin/UC-1-Pro/extensions:ro
       - ./.env:/.env:ro
       - ./docker-compose.yml:/docker-compose.yml:ro
     networks:

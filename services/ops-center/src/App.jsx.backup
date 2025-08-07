@@ -1,0 +1,138 @@
+import React, { useState, useEffect } from 'react';
+import { BrowserRouter as Router, Routes, Route, useLocation, Navigate } from 'react-router-dom';
+import PublicLanding from './pages/PublicLanding';
+import Dashboard from './pages/Dashboard';
+import AIModelManagement from './pages/AIModelManagement';
+import Services from './pages/Services';
+import System from './pages/System';
+import Network from './pages/Network';
+import Settings from './pages/Settings';
+import StorageBackup from './pages/StorageBackup';
+import Extensions from './pages/Extensions';
+import Logs from './pages/Logs';
+import Security from './pages/Security';
+import Login from './pages/Login';
+import Layout from './components/Layout';
+import ErrorBoundary from './components/ErrorBoundary';
+import LoadingScreen from './components/LoadingScreen';
+import OnboardingTour from './components/OnboardingTour';
+import HelpPanel from './components/HelpPanel';
+import { SystemProvider, useSystem } from './contexts/SystemContext';
+import { ThemeProvider } from './contexts/ThemeContext';
+
+// Protected Route wrapper
+function ProtectedRoute({ children }) {
+  const token = localStorage.getItem('authToken');
+  
+  if (!token) {
+    return <Navigate to="/admin/login" replace />;
+  }
+  
+  return children;
+}
+
+function AppRoutes() {
+  const location = useLocation();
+  const [showHelp, setShowHelp] = useState(false);
+  
+  // Keyboard shortcut for help
+  useEffect(() => {
+    const handleKeyPress = (e) => {
+      if (e.key === '?' && !e.target.matches('input, textarea, select')) {
+        setShowHelp(!showHelp);
+      }
+    };
+    
+    window.addEventListener('keydown', handleKeyPress);
+    return () => window.removeEventListener('keydown', handleKeyPress);
+  }, [showHelp]);
+  
+  const getCurrentPage = () => {
+    const path = location.pathname.slice(1);
+    return path || 'dashboard';
+  };
+  
+  return (
+    <>
+      <Routes>
+        <Route path="/admin/login" element={<Login />} />
+        <Route path="/*" element={
+          <ProtectedRoute>
+            <Layout>
+              <Routes>
+                <Route path="/" element={<Dashboard />} />
+                <Route path="/models" element={<AIModelManagement />} />
+                <Route path="/services" element={<Services />} />
+                <Route path="/system" element={<System />} />
+                <Route path="/network" element={<Network />} />
+                <Route path="/storage" element={<StorageBackup />} />
+                <Route path="/extensions" element={<Extensions />} />
+                <Route path="/logs" element={<Logs />} />
+                <Route path="/security" element={<Security />} />
+                <Route path="/settings" element={<Settings />} />
+              </Routes>
+            </Layout>
+          </ProtectedRoute>
+        } />
+      </Routes>
+      
+      <HelpPanel 
+        isOpen={showHelp} 
+        onClose={() => setShowHelp(false)}
+        currentPage={getCurrentPage()}
+      />
+    </>
+  );
+}
+
+function AppContent() {
+  const { loading, error } = useSystem();
+  const [showOnboarding, setShowOnboarding] = useState(false);
+  
+  useEffect(() => {
+    // Check if user needs onboarding
+    const hasCompletedTour = localStorage.getItem('uc1-tour-completed');
+    if (!hasCompletedTour && !loading && !error) {
+      setTimeout(() => setShowOnboarding(true), 1000);
+    }
+  }, [loading, error]);
+  
+  if (loading) {
+    return <LoadingScreen />;
+  }
+  
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gray-900 flex items-center justify-center">
+        <div className="bg-red-900 text-white p-8 rounded-lg">
+          <h1 className="text-xl font-bold mb-2">Connection Error</h1>
+          <p>{error}</p>
+          <p className="mt-4 text-sm">Please check that all services are running.</p>
+        </div>
+      </div>
+    );
+  }
+  
+  return (
+    <Router>
+      <AppRoutes />
+      {showOnboarding && (
+        <OnboardingTour onComplete={() => setShowOnboarding(false)} />
+      )}
+    </Router>
+  );
+}
+
+function App() {
+  return (
+    <ErrorBoundary>
+      <ThemeProvider>
+        <SystemProvider>
+          <AppContent />
+        </SystemProvider>
+      </ThemeProvider>
+    </ErrorBoundary>
+  );
+}
+
+export default App;

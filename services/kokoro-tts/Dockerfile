@@ -1,5 +1,6 @@
 FROM python:3.10-slim
 
+# Install dependencies including Intel GPU runtime
 RUN apt-get update && apt-get install -y \
     git \
     curl \
@@ -7,6 +8,15 @@ RUN apt-get update && apt-get install -y \
     libgomp1 \
     libtbb12 \
     ocl-icd-libopencl1 \
+    espeak-ng \
+    # Intel GPU dependencies
+    intel-opencl-icd \
+    clinfo \
+    vainfo \
+    # Additional libraries for OpenVINO
+    libpugixml1v5 \
+    libusb-1.0-0 \
+    libnuma1 \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
