@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { 
   CubeIcon,
@@ -19,11 +19,16 @@ import {
   ArrowPathIcon,
   FunnelIcon,
   ArrowsUpDownIcon,
-  Cog6ToothIcon
+  Cog6ToothIcon,
+  QuestionMarkCircleIcon,
+  ArrowTopRightOnSquareIcon,
+  ServerIcon,
+  CpuChipIcon
 } from '@heroicons/react/24/outline';
 import { useSystem } from '../contexts/SystemContext';
 import ModelSettingsForm from '../components/ModelSettingsForm';
 import modelApi from '../services/modelApi';
+import { serviceInfo, modelTips } from '../data/serviceInfo';
 
 export default function AIModelManagement() {
   const { systemStatus } = useSystem();
@@ -36,7 +41,12 @@ export default function AIModelManagement() {
   const [showModelSettings, setShowModelSettings] = useState(null); // For per-model settings
   const [showFilters, setShowFilters] = useState(false);
   const [sortBy, setSortBy] = useState('downloads'); // downloads, likes, lastModified
-  const [installedModels, setInstalledModels] = useState({ vllm: [], ollama: [] });
+  const [installedModels, setInstalledModels] = useState({ 
+    vllm: [], 
+    ollama: [], 
+    embeddings: [], 
+    reranker: [] 
+  });
   const [loadingModels, setLoadingModels] = useState(true);
   const [filters, setFilters] = useState({
     quantization: '',
@@ -78,6 +88,25 @@ export default function AIModelManagement() {
     seed: -1
   });
   
+  const [embeddingsSettings, setEmbeddingsSettings] = useState({
+    model_name: 'nomic-ai/nomic-embed-text-v1.5',
+    device: 'cpu',
+    max_length: 8192,
+    normalize: true,
+    batch_size: 32,
+    models_cache_dir: '/home/ucadmin/.cache/huggingface',
+    trust_remote_code: true
+  });
+  
+  const [rerankerSettings, setRerankerSettings] = useState({
+    model_name: 'mixedbread-ai/mxbai-rerank-large-v1',
+    device: 'cpu',
+    max_length: 512,
+    batch_size: 32,
+    models_cache_dir: '/home/ucadmin/.cache/huggingface',
+    trust_remote_code: true
+  });
+  
   // Per-model settings overrides
   const [modelOverrides, setModelOverrides] = useState({});
   const [ollamaModels, setOllamaModels] = useState([]);
@@ -86,52 +115,94 @@ export default function AIModelManagement() {
   // Search timer for debouncing
   const [searchTimer, setSearchTimer] = useState(null);
 
-  // Load installed models and settings on mount
-  useEffect(() => {
-    loadInstalledModels();
-    loadGlobalSettings();
-  }, []);
-
-  // Reload models when tab changes
-  useEffect(() => {
-    loadInstalledModels();
-  }, [activeTab]);
-
-  const loadInstalledModels = async () => {
+  const loadInstalledModels = useCallback(async () => {
     setLoadingModels(true);
     try {
+      // Load models for vLLM and Ollama from existing API
       const models = await modelApi.getInstalledModels();
-      setInstalledModels(models);
+      
+      // Load cached models for embeddings and reranker services only if needed
+      const promises = [];
+      if (activeTab === 'embeddings' || activeTab === 'vllm') {
+        promises.push(modelApi.getCachedModels('embeddings').catch(() => ({ cached_models: [] })));
+      }
+      if (activeTab === 'reranker' || activeTab === 'vllm') {
+        promises.push(modelApi.getCachedModels('reranker').catch(() => ({ cached_models: [] })));
+      }
+      
+      const [embeddingsModels, rerankerModels] = await Promise.all([
+        ...promises,
+        Promise.resolve({ cached_models: [] }),
+        Promise.resolve({ cached_models: [] })
+      ].slice(0, 2));
+      
+      setInstalledModels(prevModels => ({
+        ...prevModels,
+        ...models,
+        embeddings: embeddingsModels?.cached_models || prevModels.embeddings || [],
+        reranker: rerankerModels?.cached_models || prevModels.reranker || []
+      }));
       
       // Also load any active downloads
-      const downloads = await modelApi.getAllDownloads();
+      const downloads = await modelApi.getAllDownloads().catch(() => ({}));
       // Update download progress state
       const progressMap = {};
-      Object.entries(downloads).forEach(([taskId, task]) => {
-        if (task.status === 'downloading') {
-          progressMap[task.model_id] = task.progress;
+      Object.entries(downloads || {}).forEach(([taskId, task]) => {
+        if (task?.status === 'downloading' && task?.model_id) {
+          progressMap[task.model_id] = task.progress || 0;
         }
       });
       setDownloadProgress(progressMap);
     } catch (error) {
       console.error('Failed to load models:', error);
+      // Keep existing models on error
     } finally {
       setLoadingModels(false);
     }
-  };
+  }, [activeTab]);
+
+  // Load installed models and settings on mount
+  useEffect(() => {
+    loadInstalledModels();
+    loadGlobalSettings();
+  }, [loadInstalledModels]);
+
+  // Reload models when tab changes
+  useEffect(() => {
+    loadInstalledModels();
+  }, [activeTab, loadInstalledModels]);
 
   const loadGlobalSettings = async () => {
     try {
       const [vllm, ollama] = await Promise.all([
-        modelApi.getGlobalSettings('vllm'),
-        modelApi.getGlobalSettings('ollama')
+        modelApi.getGlobalSettings('vllm').catch(err => {
+          console.warn('Failed to load vLLM settings:', err);
+          return vllmSettings; // Keep current settings
+        }),
+        modelApi.getGlobalSettings('ollama').catch(err => {
+          console.warn('Failed to load Ollama settings:', err);
+          return ollamaSettings; // Keep current settings
+        })
       ]);
-      setVllmSettings(vllm);
-      setOllamaSettings(ollama);
+      setVllmSettings(prevSettings => ({ ...prevSettings, ...vllm }));
+      setOllamaSettings(prevSettings => ({ ...prevSettings, ...ollama }));
     } catch (error) {
       console.error('Failed to load settings:', error);
+      // Settings will remain at their default values
     }
   };
+
+  // Memoized service-specific filters
+  const currentServiceFilters = useMemo(() => {
+    if (!serviceInfo[activeTab]?.defaultFilters) return {};
+    return serviceInfo[activeTab].defaultFilters;
+  }, [activeTab]);
+
+  // Get service-specific filters
+  const getServiceFilters = useCallback((service) => {
+    if (!serviceInfo[service]?.defaultFilters) return {};
+    return serviceInfo[service].defaultFilters;
+  }, []);
 
   // Advanced search from Hugging Face
   useEffect(() => {
@@ -149,15 +220,18 @@ export default function AIModelManagement() {
     
     const timer = setTimeout(async () => {
       try {
+        // Get service-specific default filters
+        const defaultFilters = currentServiceFilters;
+        
         // Build search parameters with filters
         let searchUrl = `https://huggingface.co/api/models?search=${encodeURIComponent(searchQuery)}`;
         
-        // Add model type filter based on tab
-        if (activeTab === 'vllm') {
-          searchUrl += '&filter=text-generation';
+        // Add service-specific default filters
+        if (defaultFilters.task) {
+          searchUrl += `&pipeline_tag=${defaultFilters.task}`;
         }
         
-        // Add additional filters
+        // Add user-selected filters (override defaults if specified)
         if (filters.task) {
           searchUrl += `&pipeline_tag=${filters.task}`;
         }
@@ -168,7 +242,7 @@ export default function AIModelManagement() {
           searchUrl += `&license=${filters.license}`;
         }
         
-        searchUrl += '&limit=50'; // Get more results for filtering
+        searchUrl += '&limit=100'; // Get more results for filtering
         
         const response = await fetch(searchUrl);
         
@@ -177,7 +251,49 @@ export default function AIModelManagement() {
           
           // Apply client-side filters
           data = data.filter(model => {
-            // Quantization filter
+            // Service-specific filtering
+            if (activeTab === 'vllm') {
+              // vLLM: prefer quantized models (AWQ, GPTQ, FP8)
+              const isTextGeneration = model.pipeline_tag === 'text-generation' || 
+                                     model.tags?.some(tag => tag.toLowerCase().includes('text-generation'));
+              if (!isTextGeneration) return false;
+              
+              // Boost models with quantization tags
+              if (defaultFilters.quantization && !filters.quantization) {
+                const hasQuantization = model.tags?.some(tag => 
+                  defaultFilters.quantization.some(q => tag.toLowerCase().includes(q))
+                );
+                model._hasQuantization = hasQuantization;
+              }
+            } else if (activeTab === 'ollama') {
+              // Ollama: prefer GGUF models
+              if (defaultFilters.format && !filters.quantization) {
+                const hasGGUF = model.tags?.some(tag => 
+                  tag.toLowerCase().includes('gguf')
+                ) || model.modelId.toLowerCase().includes('gguf');
+                model._hasGGUF = hasGGUF;
+              }
+            } else if (activeTab === 'embeddings') {
+              // Embeddings: filter for sentence-transformers models
+              if (defaultFilters.library) {
+                const hasLibrary = model.tags?.some(tag => 
+                  tag.toLowerCase().includes(defaultFilters.library)
+                ) || model.library_name === defaultFilters.library ||
+                  model.pipeline_tag === 'feature-extraction';
+                if (!hasLibrary) return false;
+              }
+            } else if (activeTab === 'reranker') {
+              // Reranker: filter for cross-encoder models or reranking task
+              const isReranker = model.tags?.some(tag => 
+                tag.toLowerCase().includes('rerank') || 
+                tag.toLowerCase().includes('cross-encoder')
+              ) || model.pipeline_tag === 'sentence-similarity' ||
+                model.modelId.toLowerCase().includes('rerank') ||
+                model.modelId.toLowerCase().includes('cross-encoder');
+              if (!isReranker) return false;
+            }
+            
+            // User-specified quantization filter
             if (filters.quantization) {
               const hasQuantization = model.tags?.some(tag => 
                 tag.toLowerCase().includes(filters.quantization.toLowerCase())
@@ -186,7 +302,6 @@ export default function AIModelManagement() {
             }
             
             // Size filters (if available in metadata)
-            // This is approximate based on model name patterns
             if (filters.minSize || filters.maxSize) {
               const sizeMatch = model.modelId.match(/(\d+)B/i);
               if (sizeMatch) {
@@ -199,8 +314,16 @@ export default function AIModelManagement() {
             return true;
           });
           
-          // Sort results
+          // Sort results with compatibility boost
           data.sort((a, b) => {
+            // First, prioritize compatible models
+            const aCompatible = a._hasQuantization || a._hasGGUF || false;
+            const bCompatible = b._hasQuantization || b._hasGGUF || false;
+            
+            if (aCompatible && !bCompatible) return -1;
+            if (!aCompatible && bCompatible) return 1;
+            
+            // Then sort by user preference
             switch (sortBy) {
               case 'downloads':
                 return (b.downloads || 0) - (a.downloads || 0);
@@ -221,7 +344,7 @@ export default function AIModelManagement() {
       } finally {
         setSearching(false);
       }
-    }, 300);
+    }, searchQuery.length > 2 ? 300 : 1000); // Longer delay for short queries
     
     setSearchTimer(timer);
     
@@ -366,7 +489,7 @@ export default function AIModelManagement() {
           AI Model Management
         </h1>
         <p className="mt-2 text-gray-600 dark:text-gray-400">
-          Manage models for vLLM and Ollama inference engines with granular control
+          Manage models for vLLM, Ollama, Embedding, and Reranker services with granular control
         </p>
       </div>
 
@@ -399,7 +522,135 @@ export default function AIModelManagement() {
               Ollama Models
             </div>
           </button>
+          <button
+            onClick={() => setActiveTab('embeddings')}
+            className={`py-2 px-1 border-b-2 font-medium text-sm ${
+              activeTab === 'embeddings'
+                ? 'border-blue-500 text-blue-600 dark:text-blue-400'
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+            }`}
+          >
+            <div className="flex items-center gap-2">
+              <CubeIcon className="h-5 w-5" />
+              iGPU Embeddings
+            </div>
+          </button>
+          <button
+            onClick={() => setActiveTab('reranker')}
+            className={`py-2 px-1 border-b-2 font-medium text-sm ${
+              activeTab === 'reranker'
+                ? 'border-blue-500 text-blue-600 dark:text-blue-400'
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+            }`}
+          >
+            <div className="flex items-center gap-2">
+              <CubeIcon className="h-5 w-5" />
+              iGPU Reranker
+            </div>
+          </button>
         </nav>
+      </div>
+
+      {/* Service Information Card */}
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+        <div className="flex justify-between items-start">
+          <div className="flex-1">
+            <div className="flex items-center gap-3 mb-3">
+              {activeTab === 'vllm' || activeTab === 'ollama' ? (
+                <ServerIcon className="h-8 w-8 text-blue-500" />
+              ) : (
+                <CpuChipIcon className="h-8 w-8 text-purple-500" />
+              )}
+              <div>
+                <h3 className="text-xl font-semibold text-gray-900 dark:text-white">
+                  {serviceInfo[activeTab].name}
+                </h3>
+                <p className="text-sm text-gray-500 dark:text-gray-400">
+                  {activeTab === 'vllm' || activeTab === 'ollama' ? 'GPU Accelerated' : 'Intel iGPU Optimized'}
+                </p>
+              </div>
+            </div>
+            
+            <p className="text-gray-600 dark:text-gray-300 mb-4">
+              {serviceInfo[activeTab].description}
+            </p>
+            
+            <div className="grid grid-cols-2 gap-4 mb-4">
+              <div>
+                <h4 className="font-medium text-gray-900 dark:text-white mb-2">Key Features:</h4>
+                <ul className="text-sm text-gray-600 dark:text-gray-400 space-y-1">
+                  {serviceInfo[activeTab]?.features?.slice(0, 3).map((feature, idx) => (
+                    <li key={idx} className="flex items-start">
+                      <CheckCircleIcon className="h-4 w-4 text-green-500 mr-2 mt-0.5 flex-shrink-0" />
+                      {feature}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+              
+              <div>
+                <h4 className="font-medium text-gray-900 dark:text-white mb-2">Compatible Models:</h4>
+                <p className="text-sm text-gray-600 dark:text-gray-400">
+                  {serviceInfo[activeTab]?.compatibleModels}
+                </p>
+                
+                <div className="mt-3 bg-blue-50 dark:bg-blue-900/20 rounded p-2">
+                  <p className="text-xs text-blue-800 dark:text-blue-200">
+                    <strong>Tip:</strong> {modelTips[activeTab]?.selection}
+                  </p>
+                </div>
+              </div>
+            </div>
+            
+            <div className="flex gap-3">
+              {serviceInfo[activeTab]?.homepage && (
+                <a
+                  href={serviceInfo[activeTab]?.homepage}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 text-sm text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
+                >
+                  <ArrowTopRightOnSquareIcon className="h-4 w-4" />
+                  Homepage
+                </a>
+              )}
+              {serviceInfo[activeTab]?.github && (
+                <a
+                  href={serviceInfo[activeTab]?.github}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 text-sm text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
+                >
+                  <ArrowTopRightOnSquareIcon className="h-4 w-4" />
+                  GitHub
+                </a>
+              )}
+              {serviceInfo[activeTab]?.docs && (
+                <a
+                  href={serviceInfo[activeTab]?.docs}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 text-sm text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
+                >
+                  <DocumentTextIcon className="h-4 w-4" />
+                  Documentation
+                </a>
+              )}
+            </div>
+          </div>
+          
+          <div className="ml-4">
+            <div className="relative group">
+              <QuestionMarkCircleIcon className="h-6 w-6 text-gray-400 hover:text-gray-600 cursor-help" />
+              <div className="absolute right-0 mt-2 w-64 p-3 bg-gray-900 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-10">
+                <div className="space-y-2">
+                  <p><strong>Memory:</strong> {modelTips[activeTab]?.memory}</p>
+                  <p><strong>Performance:</strong> {modelTips[activeTab]?.performance}</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* Settings Button */}
@@ -409,7 +660,12 @@ export default function AIModelManagement() {
           className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 flex items-center gap-2"
         >
           <AdjustmentsHorizontalIcon className="h-5 w-5" />
-          Global {activeTab === 'vllm' ? 'vLLM' : 'Ollama'} Settings
+          Global {
+            activeTab === 'vllm' ? 'vLLM' : 
+            activeTab === 'ollama' ? 'Ollama' :
+            activeTab === 'embeddings' ? 'Embeddings' :
+            'Reranker'
+          } Settings
         </button>
       </div>
 
@@ -421,13 +677,18 @@ export default function AIModelManagement() {
           className="bg-white dark:bg-gray-800 rounded-lg shadow p-6"
         >
           <h3 className="text-lg font-semibold mb-4">
-            Global {activeTab === 'vllm' ? 'vLLM' : 'Ollama'} Settings
+            Global {
+              activeTab === 'vllm' ? 'vLLM' : 
+              activeTab === 'ollama' ? 'Ollama' :
+              activeTab === 'embeddings' ? 'Embeddings' :
+              'Reranker'
+            } Settings
           </h3>
           <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
             These settings apply to all models unless overridden by model-specific settings.
           </p>
           
-          {activeTab === 'vllm' ? (
+          {activeTab === 'vllm' && (
             <div className="grid grid-cols-2 gap-6">
               <div>
                 <h3 className="text-lg font-semibold mb-4">GPU Settings</h3>
@@ -612,7 +873,9 @@ export default function AIModelManagement() {
                 </div>
               </div>
             </div>
-          ) : (
+          )}
+
+          {activeTab === 'ollama' && (
             <div className="grid grid-cols-2 gap-6">
               <div>
                 <h3 className="text-lg font-semibold mb-4">Performance Settings</h3>
@@ -770,6 +1033,266 @@ export default function AIModelManagement() {
             </div>
           )}
 
+          {activeTab === 'embeddings' && (
+            <div className="grid grid-cols-2 gap-6">
+              <div>
+                <h3 className="text-lg font-semibold mb-4">Embeddings Model Settings</h3>
+                
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium mb-2">
+                      Current Model
+                    </label>
+                    <select
+                      value={embeddingsSettings.model_name}
+                      onChange={(e) => setEmbeddingsSettings({
+                        ...embeddingsSettings,
+                        model_name: e.target.value
+                      })}
+                      className="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600"
+                    >
+                      <option value="nomic-ai/nomic-embed-text-v1.5">Nomic Embed Text v1.5 (768 dim)</option>
+                      <option value="BAAI/bge-base-en-v1.5">BGE Base EN v1.5 (768 dim)</option>
+                      <option value="BAAI/bge-large-en-v1.5">BGE Large EN v1.5 (1024 dim)</option>
+                      <option value="BAAI/bge-small-en-v1.5">BGE Small EN v1.5 (384 dim)</option>
+                      <option value="sentence-transformers/all-MiniLM-L6-v2">All-MiniLM-L6-v2 (384 dim)</option>
+                      <option value="sentence-transformers/all-mpnet-base-v2">All-MPNet-Base-v2 (768 dim)</option>
+                      <option value="thenlper/gte-large">GTE Large (1024 dim)</option>
+                      <option value="thenlper/gte-base">GTE Base (768 dim)</option>
+                      <option value="thenlper/gte-small">GTE Small (384 dim)</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium mb-2">
+                      Device
+                    </label>
+                    <select
+                      value={embeddingsSettings.device}
+                      onChange={(e) => setEmbeddingsSettings({
+                        ...embeddingsSettings,
+                        device: e.target.value
+                      })}
+                      className="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600"
+                    >
+                      <option value="cpu">CPU (Intel iGPU via OpenVINO)</option>
+                      <option value="cuda">CUDA (NVIDIA GPU)</option>
+                      <option value="mps">MPS (Apple Silicon)</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium mb-2">
+                      Max Length
+                    </label>
+                    <select
+                      value={embeddingsSettings.max_length}
+                      onChange={(e) => setEmbeddingsSettings({
+                        ...embeddingsSettings,
+                        max_length: parseInt(e.target.value)
+                      })}
+                      className="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600"
+                    >
+                      <option value={512}>512 tokens</option>
+                      <option value={1024}>1024 tokens</option>
+                      <option value={2048}>2048 tokens</option>
+                      <option value={4096}>4096 tokens</option>
+                      <option value={8192}>8192 tokens</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <h3 className="text-lg font-semibold mb-4">Performance Settings</h3>
+                
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium mb-2">
+                      Batch Size
+                    </label>
+                    <input
+                      type="number"
+                      min="1"
+                      max="128"
+                      value={embeddingsSettings.batch_size}
+                      onChange={(e) => setEmbeddingsSettings({
+                        ...embeddingsSettings,
+                        batch_size: parseInt(e.target.value)
+                      })}
+                      className="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium mb-2">
+                      Model Cache Directory
+                    </label>
+                    <input
+                      type="text"
+                      value={embeddingsSettings.models_cache_dir}
+                      onChange={(e) => setEmbeddingsSettings({
+                        ...embeddingsSettings,
+                        models_cache_dir: e.target.value
+                      })}
+                      className="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        checked={embeddingsSettings.normalize}
+                        onChange={(e) => setEmbeddingsSettings({
+                          ...embeddingsSettings,
+                          normalize: e.target.checked
+                        })}
+                        className="rounded"
+                      />
+                      <span className="text-sm">Normalize embeddings (L2 normalization)</span>
+                    </label>
+
+                    <label className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        checked={embeddingsSettings.trust_remote_code}
+                        onChange={(e) => setEmbeddingsSettings({
+                          ...embeddingsSettings,
+                          trust_remote_code: e.target.checked
+                        })}
+                        className="rounded"
+                      />
+                      <span className="text-sm">Trust remote code (required for some models)</span>
+                    </label>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'reranker' && (
+            <div className="grid grid-cols-2 gap-6">
+              <div>
+                <h3 className="text-lg font-semibold mb-4">Reranker Model Settings</h3>
+                
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium mb-2">
+                      Current Model
+                    </label>
+                    <select
+                      value={rerankerSettings.model_name}
+                      onChange={(e) => setRerankerSettings({
+                        ...rerankerSettings,
+                        model_name: e.target.value
+                      })}
+                      className="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600"
+                    >
+                      <option value="mixedbread-ai/mxbai-rerank-large-v1">MxBai Rerank Large v1</option>
+                      <option value="mixedbread-ai/mxbai-rerank-base-v1">MxBai Rerank Base v1</option>
+                      <option value="BAAI/bge-reranker-v2-m3">BGE Reranker v2 M3</option>
+                      <option value="BAAI/bge-reranker-large">BGE Reranker Large</option>
+                      <option value="BAAI/bge-reranker-base">BGE Reranker Base</option>
+                      <option value="cross-encoder/ms-marco-MiniLM-L-6-v2">MS-MARCO MiniLM L6 v2</option>
+                      <option value="cross-encoder/ms-marco-MiniLM-L-12-v2">MS-MARCO MiniLM L12 v2</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium mb-2">
+                      Device
+                    </label>
+                    <select
+                      value={rerankerSettings.device}
+                      onChange={(e) => setRerankerSettings({
+                        ...rerankerSettings,
+                        device: e.target.value
+                      })}
+                      className="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600"
+                    >
+                      <option value="cpu">CPU (Intel iGPU via OpenVINO)</option>
+                      <option value="cuda">CUDA (NVIDIA GPU)</option>
+                      <option value="mps">MPS (Apple Silicon)</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium mb-2">
+                      Max Length
+                    </label>
+                    <select
+                      value={rerankerSettings.max_length}
+                      onChange={(e) => setRerankerSettings({
+                        ...rerankerSettings,
+                        max_length: parseInt(e.target.value)
+                      })}
+                      className="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600"
+                    >
+                      <option value={256}>256 tokens</option>
+                      <option value={512}>512 tokens</option>
+                      <option value={1024}>1024 tokens</option>
+                      <option value={2048}>2048 tokens</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <h3 className="text-lg font-semibold mb-4">Performance Settings</h3>
+                
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium mb-2">
+                      Batch Size
+                    </label>
+                    <input
+                      type="number"
+                      min="1"
+                      max="128"
+                      value={rerankerSettings.batch_size}
+                      onChange={(e) => setRerankerSettings({
+                        ...rerankerSettings,
+                        batch_size: parseInt(e.target.value)
+                      })}
+                      className="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium mb-2">
+                      Model Cache Directory
+                    </label>
+                    <input
+                      type="text"
+                      value={rerankerSettings.models_cache_dir}
+                      onChange={(e) => setRerankerSettings({
+                        ...rerankerSettings,
+                        models_cache_dir: e.target.value
+                      })}
+                      className="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        checked={rerankerSettings.trust_remote_code}
+                        onChange={(e) => setRerankerSettings({
+                          ...rerankerSettings,
+                          trust_remote_code: e.target.checked
+                        })}
+                        className="rounded"
+                      />
+                      <span className="text-sm">Trust remote code (required for some models)</span>
+                    </label>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
           <div className="mt-6 flex justify-end gap-2">
             <button
               onClick={() => setShowSettings(false)}
@@ -780,10 +1303,18 @@ export default function AIModelManagement() {
             <button
               onClick={async () => {
                 try {
-                  await modelApi.updateGlobalSettings(
-                    activeTab, 
-                    activeTab === 'vllm' ? vllmSettings : ollamaSettings
-                  );
+                  let settingsToSave;
+                  if (activeTab === 'vllm') {
+                    settingsToSave = vllmSettings;
+                  } else if (activeTab === 'ollama') {
+                    settingsToSave = ollamaSettings;
+                  } else if (activeTab === 'embeddings') {
+                    settingsToSave = embeddingsSettings;
+                  } else if (activeTab === 'reranker') {
+                    settingsToSave = rerankerSettings;
+                  }
+                  
+                  await modelApi.updateGlobalSettings(activeTab, settingsToSave);
                   alert('Global settings saved successfully');
                   setShowSettings(false);
                 } catch (error) {
@@ -809,7 +1340,12 @@ export default function AIModelManagement() {
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder={`Search Hugging Face for ${activeTab === 'vllm' ? 'vLLM-compatible' : 'Ollama-compatible'} models...`}
+                placeholder={`Search Hugging Face for ${
+                  activeTab === 'vllm' ? 'text generation (AWQ/GPTQ quantized)' :
+                  activeTab === 'ollama' ? 'GGUF format' :
+                  activeTab === 'embeddings' ? 'sentence-transformers embedding' :
+                  'cross-encoder reranking'
+                } models...`}
                 className="w-full px-4 py-2 pl-10 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white"
               />
               <MagnifyingGlassIcon className="absolute left-3 top-2.5 h-5 w-5 text-gray-400" />
@@ -1006,12 +1542,17 @@ export default function AIModelManagement() {
       {/* Installed Models */}
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
         <h2 className="text-lg font-semibold mb-4 text-gray-900 dark:text-white">
-          Installed {activeTab === 'vllm' ? 'vLLM' : 'Ollama'} Models
+          Installed {
+            activeTab === 'vllm' ? 'vLLM' : 
+            activeTab === 'ollama' ? 'Ollama' :
+            activeTab === 'embeddings' ? 'Embedding' :
+            'Reranker'
+          } Models
         </h2>
 
         <div className="space-y-4">
-          {activeTab === 'vllm' ? (
-            installedModels.vllm.length === 0 ? (
+          {activeTab === 'vllm' && (
+            !installedModels?.vllm || installedModels.vllm.length === 0 ? (
               <p className="text-gray-500 dark:text-gray-400 text-center py-8">
                 No vLLM models installed yet. Search and download models above.
               </p>
@@ -1080,8 +1621,10 @@ export default function AIModelManagement() {
                 </motion.div>
               ))
             )
-          ) : (
-            installedModels.ollama.length === 0 ? (
+          )}
+
+          {activeTab === 'ollama' && (
+            !installedModels?.ollama || installedModels.ollama.length === 0 ? (
               <p className="text-gray-500 dark:text-gray-400 text-center py-8">
                 No Ollama models installed yet. Search and download models above.
               </p>
@@ -1132,6 +1675,136 @@ export default function AIModelManagement() {
                       </button>
                       <button
                         onClick={() => deleteModel('ollama', model.name)}
+                        className="px-3 py-1 bg-red-600 text-white rounded hover:bg-red-700"
+                      >
+                        <TrashIcon className="h-4 w-4" />
+                      </button>
+                    </div>
+                  </div>
+                </motion.div>
+              ))
+            )
+          )}
+
+          {activeTab === 'embeddings' && (
+            !installedModels?.embeddings || installedModels.embeddings.length === 0 ? (
+              <div className="text-center py-8">
+                <p className="text-gray-500 dark:text-gray-400 mb-4">
+                  Current embedding model: {embeddingsSettings.model_name}
+                </p>
+                <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg max-w-md mx-auto">
+                  <p className="text-sm text-blue-800 dark:text-blue-200">
+                    The embedding service runs on Intel iGPU for optimal resource allocation.
+                    You can change the model in the Global Settings above.
+                  </p>
+                </div>
+              </div>
+            ) : (
+              installedModels.embeddings.map((model) => (
+                <motion.div
+                  key={model.name}
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  className="border dark:border-gray-700 rounded-lg p-4"
+                >
+                  <div className="flex justify-between items-center">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2">
+                        <h4 className="font-medium text-gray-900 dark:text-white">{model.name}</h4>
+                        {model.active && (
+                          <span className="px-2 py-1 bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200 text-xs rounded-full">
+                            Active
+                          </span>
+                        )}
+                        <span className="px-2 py-1 bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 text-xs rounded-full">
+                          {model.dimensions} dimensions
+                        </span>
+                      </div>
+                      <div className="flex gap-4 mt-2 text-sm text-gray-500">
+                        <span>Size: {formatBytes(model.size)}</span>
+                        <span>Device: {model.device || 'CPU (iGPU)'}</span>
+                        {model.last_used && (
+                          <span>Last used: {new Date(model.last_used).toLocaleDateString()}</span>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex gap-2">
+                      {!model.active && (
+                        <button
+                          onClick={() => activateModel('embeddings', model.name)}
+                          className="px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 flex items-center gap-1"
+                        >
+                          <PlayIcon className="h-4 w-4" />
+                          Activate
+                        </button>
+                      )}
+                      <button
+                        onClick={() => deleteModel('embeddings', model.name)}
+                        className="px-3 py-1 bg-red-600 text-white rounded hover:bg-red-700"
+                      >
+                        <TrashIcon className="h-4 w-4" />
+                      </button>
+                    </div>
+                  </div>
+                </motion.div>
+              ))
+            )
+          )}
+
+          {activeTab === 'reranker' && (
+            !installedModels?.reranker || installedModels.reranker.length === 0 ? (
+              <div className="text-center py-8">
+                <p className="text-gray-500 dark:text-gray-400 mb-4">
+                  Current reranker model: {rerankerSettings.model_name}
+                </p>
+                <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg max-w-md mx-auto">
+                  <p className="text-sm text-blue-800 dark:text-blue-200">
+                    The reranker service runs on Intel iGPU for optimal resource allocation.
+                    You can change the model in the Global Settings above.
+                  </p>
+                </div>
+              </div>
+            ) : (
+              installedModels.reranker.map((model) => (
+                <motion.div
+                  key={model.name}
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  className="border dark:border-gray-700 rounded-lg p-4"
+                >
+                  <div className="flex justify-between items-center">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2">
+                        <h4 className="font-medium text-gray-900 dark:text-white">{model.name}</h4>
+                        {model.active && (
+                          <span className="px-2 py-1 bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200 text-xs rounded-full">
+                            Active
+                          </span>
+                        )}
+                        <span className="px-2 py-1 bg-purple-100 dark:bg-purple-900 text-purple-800 dark:text-purple-200 text-xs rounded-full">
+                          Cross-encoder
+                        </span>
+                      </div>
+                      <div className="flex gap-4 mt-2 text-sm text-gray-500">
+                        <span>Size: {formatBytes(model.size)}</span>
+                        <span>Device: {model.device || 'CPU (iGPU)'}</span>
+                        {model.last_used && (
+                          <span>Last used: {new Date(model.last_used).toLocaleDateString()}</span>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex gap-2">
+                      {!model.active && (
+                        <button
+                          onClick={() => activateModel('reranker', model.name)}
+                          className="px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 flex items-center gap-1"
+                        >
+                          <PlayIcon className="h-4 w-4" />
+                          Activate
+                        </button>
+                      )}
+                      <button
+                        onClick={() => deleteModel('reranker', model.name)}
                         className="px-3 py-1 bg-red-600 text-white rounded hover:bg-red-700"
                       >
                         <TrashIcon className="h-4 w-4" />

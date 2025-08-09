@@ -38,7 +38,9 @@ const serviceUrls = {
   'comfyui': 'http://localhost:8188',
   'n8n': 'http://localhost:5678',
   'qdrant': 'http://localhost:6333/dashboard',
-  'admin-dashboard': 'http://localhost:8084'
+  'admin-dashboard': 'http://localhost:8084',
+  'ollama': 'http://localhost:11434',
+  'ollama-webui': 'http://localhost:11435'
 };
 
 // Helper functions
@@ -191,9 +193,9 @@ export default function Services() {
     }
   });
   
-  // Group services by category
-  const coreServices = sortedServices.filter(s => s.category === 'core' || !s.category); // Default to core if no category
-  const extensionServices = sortedServices.filter(s => s.category === 'extension');
+  // Group services by type
+  const coreServices = sortedServices.filter(s => s.type === 'core' || !s.type); // Default to core if no type
+  const extensionServices = sortedServices.filter(s => s.type === 'extension');
 
   return (
     <div className="space-y-8">

@@ -10,21 +10,26 @@ def get_running_services() -> List[Dict[str, Any]]:
     """Get running UC-1 Pro services directly via CLI"""
     services = []
     
-    # UC-1 Pro service mappings
+    # UC-1 Pro service mappings with type information
     service_map = {
-        'unicorn-vllm': {'name': 'vllm', 'display_name': 'vLLM', 'port': '8000'},
-        'unicorn-open-webui': {'name': 'open-webui', 'display_name': 'Open WebUI', 'port': '8080'},
-        'unicorn-redis': {'name': 'redis', 'display_name': 'Redis', 'port': '6379'},
-        'unicorn-postgresql': {'name': 'postgresql', 'display_name': 'PostgreSQL', 'port': '5432'},
-        'unicorn-qdrant': {'name': 'qdrant', 'display_name': 'Qdrant', 'port': '6333'},
-        'unicorn-whisperx': {'name': 'whisperx', 'display_name': 'WhisperX', 'port': '9000'},
-        'unicorn-kokoro': {'name': 'kokoro-tts', 'display_name': 'Kokoro TTS', 'port': '8880'},
-        'unicorn-searxng': {'name': 'searxng', 'display_name': 'Center-Deep', 'port': '8888'},
-        'unicorn-embeddings': {'name': 'embeddings', 'display_name': 'Embeddings', 'port': '8082'},
-        'unicorn-reranker': {'name': 'reranker', 'display_name': 'Reranker', 'port': '8083'},
-        'unicorn-tika': {'name': 'tika', 'display_name': 'Apache Tika', 'port': '9998'},
-        'unicorn-ops-center': {'name': 'ops-center', 'display_name': 'Operations Center', 'port': '8084'},
-        'unicorn-gpu-exporter': {'name': 'gpu-metrics', 'display_name': 'GPU Metrics', 'port': '9835'}
+        # Core Services
+        'unicorn-vllm': {'name': 'vllm', 'display_name': 'vLLM', 'port': '8000', 'type': 'core', 'category': 'inference'},
+        'unicorn-open-webui': {'name': 'open-webui', 'display_name': 'Open WebUI', 'port': '8080', 'type': 'core', 'category': 'interface'},
+        'unicorn-redis': {'name': 'redis', 'display_name': 'Redis', 'port': '6379', 'type': 'core', 'category': 'database'},
+        'unicorn-postgresql': {'name': 'postgresql', 'display_name': 'PostgreSQL', 'port': '5432', 'type': 'core', 'category': 'database'},
+        'unicorn-qdrant': {'name': 'qdrant', 'display_name': 'Qdrant', 'port': '6333', 'type': 'core', 'category': 'database'},
+        'unicorn-whisperx': {'name': 'whisperx', 'display_name': 'WhisperX', 'port': '9000', 'type': 'core', 'category': 'processing'},
+        'unicorn-kokoro': {'name': 'kokoro-tts', 'display_name': 'Kokoro TTS', 'port': '8880', 'type': 'core', 'category': 'processing'},
+        'unicorn-searxng': {'name': 'searxng', 'display_name': 'Center-Deep', 'port': '8888', 'type': 'core', 'category': 'search'},
+        'unicorn-embeddings': {'name': 'embeddings', 'display_name': 'Embeddings', 'port': '8082', 'type': 'core', 'category': 'processing'},
+        'unicorn-reranker': {'name': 'reranker', 'display_name': 'Reranker', 'port': '8083', 'type': 'core', 'category': 'processing'},
+        'unicorn-tika': {'name': 'tika', 'display_name': 'Apache Tika', 'port': '9998', 'type': 'core', 'category': 'processing'},
+        'unicorn-ops-center': {'name': 'ops-center', 'display_name': 'Operations Center', 'port': '8084', 'type': 'core', 'category': 'management'},
+        'unicorn-gpu-exporter': {'name': 'gpu-metrics', 'display_name': 'GPU Metrics', 'port': '9835', 'type': 'core', 'category': 'monitoring'},
+        
+        # Extension Services
+        'unicorn-ollama': {'name': 'ollama', 'display_name': 'Ollama', 'port': '11434', 'type': 'extension', 'category': 'inference'},
+        'unicorn-ollama-webui': {'name': 'ollama-webui', 'display_name': 'Ollama WebUI', 'port': '11435', 'type': 'extension', 'category': 'interface'}
     }
     
     try:
@@ -109,9 +114,10 @@ def get_running_services() -> List[Dict[str, Any]]:
                 'container_name': container_name,
                 'cpu_percent': cpu_percent,
                 'memory_mb': memory_mb,
-                'category': 'core',
-                'gpu_enabled': service_info['name'] in ['vllm', 'whisperx', 'kokoro-tts'],
-                'description': f"UC-1 Pro service: {service_info['name']}",
+                'type': service_info.get('type', 'core'),
+                'category': service_info.get('category', 'general'),
+                'gpu_enabled': service_info['name'] in ['vllm', 'whisperx', 'kokoro-tts', 'ollama'],
+                'description': f"UC-1 Pro {'extension' if service_info.get('type') == 'extension' else 'core'} service: {service_info['name']}",
                 'image': 'unknown',
                 'uptime': None
             })

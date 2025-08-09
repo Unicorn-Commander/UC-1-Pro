@@ -16,10 +16,10 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-# Configuration paths
-MODEL_SETTINGS_PATH = "/home/ucadmin/UC-1-Pro/volumes/model_settings.json"
-VLLM_MODELS_DIR = "/home/ucadmin/UC-1-Pro/volumes/vllm_models"
-OLLAMA_MODELS_DIR = os.path.expanduser("~/.ollama/models")
+# Configuration paths (adjusted for container environment)
+MODEL_SETTINGS_PATH = "/volumes/model_settings.json"
+VLLM_MODELS_DIR = "/volumes/vllm_models"
+OLLAMA_MODELS_DIR = "/volumes/ollama_models"
 
 # Pydantic models for API requests/responses
 class VLLMSettings(BaseModel):
@@ -167,26 +167,36 @@ class AIModelManager:
     
     async def scan_local_models(self) -> Dict[str, List[Dict]]:
         """Scan for locally installed models"""
-        models = {"vllm": [], "ollama": []}
+        models = {"vllm": [], "ollama": [], "embeddings": [], "reranker": []}
         
         # Scan vLLM models directory
         if os.path.exists(VLLM_MODELS_DIR):
             for model_dir in Path(VLLM_MODELS_DIR).iterdir():
-                if model_dir.is_dir():
+                if model_dir.is_dir() and not model_dir.name.startswith('.'):
+                    # Handle both simple directory structure and HuggingFace cache structure
+                    if model_dir.name.startswith("models--"):
+                        # HuggingFace cache format: models--Qwen--Qwen2.5-32B-Instruct-AWQ
+                        model_name = model_dir.name.replace("models--", "").replace("--", "/")
+                        display_name = model_name
+                    else:
+                        # Simple directory structure
+                        model_name = model_dir.name
+                        display_name = model_name
+                    
                     model_info = {
-                        "id": model_dir.name,
-                        "name": model_dir.name,
+                        "id": model_name,
+                        "name": display_name,
                         "path": str(model_dir),
                         "size": self._get_dir_size(model_dir),
                         "last_modified": datetime.fromtimestamp(model_dir.stat().st_mtime).isoformat(),
-                        "has_overrides": f"vllm:{model_dir.name}" in self.settings["model_overrides"]
+                        "has_overrides": f"vllm:{model_name}" in self.settings.get("model_overrides", {})
                     }
                     models["vllm"].append(model_info)
         
-        # Get Ollama models via API
+        # Get Ollama models via API (with timeout)
         try:
-            async with httpx.AsyncClient() as client:
-                response = await client.get("http://localhost:11434/api/tags")
+            async with httpx.AsyncClient(timeout=5.0) as client:
+                response = await client.get("http://unicorn-ollama:11434/api/tags")
                 if response.status_code == 200:
                     data = response.json()
                     for model in data.get("models", []):
@@ -195,11 +205,51 @@ class AIModelManager:
                             "name": model["name"],
                             "size": model.get("size", 0),
                             "last_modified": model.get("modified_at"),
-                            "has_overrides": f"ollama:{model['name']}" in self.settings["model_overrides"]
+                            "has_overrides": f"ollama:{model['name']}" in self.settings.get("model_overrides", {})
                         }
                         models["ollama"].append(model_info)
+        except (httpx.ConnectError, httpx.TimeoutException) as e:
+            logger.info(f"Ollama service not available: {e}")
         except Exception as e:
             logger.warning(f"Failed to fetch Ollama models: {e}")
+        
+        # Get Embeddings models via service API
+        try:
+            async with httpx.AsyncClient(timeout=5.0) as client:
+                response = await client.get("http://unicorn-embeddings:8082/model/cached")
+                if response.status_code == 200:
+                    data = response.json()
+                    for model in data.get("cached_models", []):
+                        models["embeddings"].append({
+                            "id": model["name"],
+                            "name": model["name"],
+                            "size": model.get("size", 0),
+                            "path": model.get("path", ""),
+                            "active": model.get("active", False)
+                        })
+        except (httpx.ConnectError, httpx.TimeoutException) as e:
+            logger.info(f"Embeddings service not available: {e}")
+        except Exception as e:
+            logger.warning(f"Failed to fetch Embeddings models: {e}")
+        
+        # Get Reranker models via service API
+        try:
+            async with httpx.AsyncClient(timeout=5.0) as client:
+                response = await client.get("http://unicorn-reranker:8083/model/cached")
+                if response.status_code == 200:
+                    data = response.json()
+                    for model in data.get("cached_models", []):
+                        models["reranker"].append({
+                            "id": model["name"],
+                            "name": model["name"],
+                            "size": model.get("size", 0),
+                            "path": model.get("path", ""),
+                            "active": model.get("active", False)
+                        })
+        except (httpx.ConnectError, httpx.TimeoutException) as e:
+            logger.info(f"Reranker service not available: {e}")
+        except Exception as e:
+            logger.warning(f"Failed to fetch Reranker models: {e}")
         
         return models
     

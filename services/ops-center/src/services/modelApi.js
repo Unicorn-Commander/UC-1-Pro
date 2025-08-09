@@ -93,11 +93,61 @@ class ModelApiService {
 
   // Delete a model
   async deleteModel(backend, modelId) {
-    const response = await fetch(`${API_BASE}/models/${backend}/${encodeURIComponent(modelId)}`, {
-      method: 'DELETE'
-    });
-    if (!response.ok) throw new Error('Failed to delete model');
-    return response.json();
+    if (backend === 'embeddings' || backend === 'reranker') {
+      // Direct service API call for embeddings/reranker
+      const servicePort = backend === 'embeddings' ? 8082 : 8083;
+      const response = await fetch(`http://localhost:${servicePort}/model/cache/${encodeURIComponent(modelId)}`, {
+        method: 'DELETE'
+      });
+      if (!response.ok) throw new Error('Failed to delete model');
+      return response.json();
+    } else {
+      const response = await fetch(`${API_BASE}/models/${backend}/${encodeURIComponent(modelId)}`, {
+        method: 'DELETE'
+      });
+      if (!response.ok) throw new Error('Failed to delete model');
+      return response.json();
+    }
+  }
+
+  // Get cached models for embeddings/reranker
+  async getCachedModels(backend) {
+    if (backend === 'embeddings' || backend === 'reranker') {
+      const servicePort = backend === 'embeddings' ? 8082 : 8083;
+      const response = await fetch(`http://localhost:${servicePort}/model/cached`);
+      if (!response.ok) throw new Error('Failed to fetch cached models');
+      return response.json();
+    }
+    return { cached_models: [] };
+  }
+
+  // Get available models for embeddings/reranker
+  async getAvailableModels(backend) {
+    if (backend === 'embeddings' || backend === 'reranker') {
+      const servicePort = backend === 'embeddings' ? 8082 : 8083;
+      const response = await fetch(`http://localhost:${servicePort}/model/available`);
+      if (!response.ok) throw new Error('Failed to fetch available models');
+      return response.json();
+    }
+    return { models: [] };
+  }
+
+  // Switch model for embeddings/reranker
+  async switchModel(backend, modelId, settings = {}) {
+    if (backend === 'embeddings' || backend === 'reranker') {
+      const servicePort = backend === 'embeddings' ? 8082 : 8083;
+      const response = await fetch(`http://localhost:${servicePort}/model/switch`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model_name: modelId,
+          ...settings
+        })
+      });
+      if (!response.ok) throw new Error('Failed to switch model');
+      return response.json();
+    }
+    return this.activateModel(backend, modelId);
   }
 
   // Legacy endpoints for backward compatibility

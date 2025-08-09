@@ -12,15 +12,27 @@ import {
   GlobeAltIcon,
   CpuChipIcon,
   ServerIcon,
-  SpeakerWaveIcon
+  SpeakerWaveIcon,
+  SunIcon,
+  MoonIcon,
+  PaintBrushIcon
 } from '@heroicons/react/24/outline';
 import { ColonelLogo, MagicUnicornLogo } from '../components/Logos';
+import { useTheme } from '../contexts/ThemeContext';
 
 export default function PublicLanding() {
   const navigate = useNavigate();
   const searchInputRef = useRef(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [currentHost, setCurrentHost] = useState('localhost');
+  const { theme, currentTheme, switchTheme, availableThemes } = useTheme();
+  
+  // Theme display configurations
+  const themeDisplayNames = {
+    dark: { name: 'Professional Dark', icon: MoonIcon },
+    light: { name: 'Professional Light', icon: SunIcon },
+    unicorn: { name: 'Magic Unicorn', icon: PaintBrushIcon }
+  };
 
   useEffect(() => {
     // Auto-focus search input when page loads
@@ -108,11 +120,91 @@ export default function PublicLanding() {
     }
   ];
 
+  // Get theme-specific styling
+  const getThemeStyles = () => {
+    if (currentTheme === 'unicorn') {
+      return {
+        background: 'min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900',
+        headerText: 'text-transparent bg-clip-text bg-gradient-to-r from-purple-400 via-pink-400 to-blue-400',
+        subText: 'text-purple-200/80',
+        searchBg: 'bg-white/10 backdrop-blur-xl rounded-2xl shadow-2xl border border-white/20',
+        searchInput: 'bg-white/10 border border-white/20 text-white placeholder-purple-300 focus:ring-purple-400',
+        searchIcon: 'text-purple-300',
+        searchButton: 'bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700',
+        cardOverlay: 'bg-white/5 backdrop-blur-xl border border-white/10',
+        footerBg: 'bg-black/20 backdrop-blur-sm border-t border-white/10',
+        logoText: 'text-purple-200',
+        footerText: 'text-purple-300/70'
+      };
+    } else if (currentTheme === 'light') {
+      return {
+        background: `min-h-screen ${theme.background}`,
+        headerText: `${theme.text.logo}`,
+        subText: `${theme.text.secondary}`,
+        searchBg: `${theme.card} shadow-xl`,
+        searchInput: `bg-gray-50 border border-gray-300 ${theme.text.primary} placeholder-gray-500 focus:ring-blue-500 focus:border-blue-500`,
+        searchIcon: 'text-gray-600',
+        searchButton: `${theme.button}`,
+        cardOverlay: `${theme.card}`,
+        footerBg: 'bg-gray-50/95 backdrop-blur-sm border-t border-gray-200',
+        logoText: `${theme.text.primary}`,
+        footerText: `${theme.text.secondary}`
+      };
+    } else { // dark theme
+      return {
+        background: `min-h-screen ${theme.background}`,
+        headerText: `${theme.text.logo}`,
+        subText: `${theme.text.secondary}`,
+        searchBg: `${theme.card} shadow-xl`,
+        searchInput: `bg-slate-700/50 border border-slate-600 ${theme.text.primary} placeholder-slate-400 focus:ring-blue-500 focus:border-blue-500`,
+        searchIcon: 'text-slate-400',
+        searchButton: `${theme.button}`,
+        cardOverlay: `${theme.card}`,
+        footerBg: 'bg-slate-900/95 backdrop-blur-sm border-t border-slate-700',
+        logoText: `${theme.text.primary}`,
+        footerText: `${theme.text.secondary}`
+      };
+    }
+  };
+
+  const styles = getThemeStyles();
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900">
+    <div className={styles.background}>
       {/* Header */}
       <header className="pt-8 pb-4">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          {/* Theme Switcher */}
+          <div className="flex justify-end mb-4">
+            <div className="flex items-center gap-2">
+              {availableThemes.map((themeId) => {
+                const ThemeIcon = themeDisplayNames[themeId].icon;
+                return (
+                  <button
+                    key={themeId}
+                    onClick={() => switchTheme(themeId)}
+                    className={`p-2 rounded-lg transition-all duration-200 ${
+                      currentTheme === themeId
+                        ? currentTheme === 'unicorn'
+                          ? 'bg-purple-600/50 text-yellow-400'
+                          : currentTheme === 'light'
+                          ? 'bg-blue-100 text-blue-600'
+                          : 'bg-slate-700 text-blue-400'
+                        : currentTheme === 'unicorn'
+                        ? 'bg-white/10 text-purple-300 hover:bg-white/20'
+                        : currentTheme === 'light'
+                        ? 'bg-white text-gray-600 hover:bg-gray-100'
+                        : 'bg-slate-800 text-slate-400 hover:bg-slate-700'
+                    }`}
+                    title={themeDisplayNames[themeId].name}
+                  >
+                    <ThemeIcon className="h-5 w-5" />
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+          
           <motion.div
             initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -124,14 +216,14 @@ export default function PublicLanding() {
               <ColonelLogo className="w-20 h-20 md:w-24 md:h-24 drop-shadow-2xl animate-pulse" />
               <div className="text-center md:text-left">
                 <div className="flex flex-col md:flex-row md:items-baseline md:gap-3">
-                  <h1 className="text-4xl md:text-5xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-purple-400 via-pink-400 to-blue-400 animate-gradient">
+                  <h1 className={`text-4xl md:text-5xl font-bold ${styles.headerText} ${currentTheme === 'unicorn' ? 'animate-gradient' : ''}`}>
                     Unicorn Commander
                   </h1>
-                  <div className="text-2xl md:text-3xl text-purple-200 font-bold tracking-widest sparkle-text">
+                  <div className={`text-2xl md:text-3xl ${styles.subText} font-bold tracking-widest ${currentTheme === 'unicorn' ? 'sparkle-text' : ''}`}>
                     PRO
                   </div>
                 </div>
-                <p className="text-lg text-purple-200/80 mt-1">
+                <p className={`text-lg ${styles.subText} mt-1`}>
                   Your AI Infrastructure Command Center
                 </p>
               </div>
@@ -147,29 +239,29 @@ export default function PublicLanding() {
         transition={{ duration: 0.6, delay: 0.2 }}
         className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 mb-12"
       >
-        <div className="bg-white/10 backdrop-blur-xl rounded-2xl shadow-2xl border border-white/20 p-8">
+        <div className={`${styles.searchBg} p-8 rounded-2xl`}>
           <form onSubmit={handleSearch} className="relative">
             <div className="relative">
-              <MagnifyingGlassIcon className="absolute left-4 top-1/2 transform -translate-y-1/2 h-6 w-6 text-purple-300" />
+              <MagnifyingGlassIcon className={`absolute left-4 top-1/2 transform -translate-y-1/2 h-6 w-6 ${styles.searchIcon}`} />
               <input
                 ref={searchInputRef}
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 onKeyPress={handleKeyPress}
-                className="w-full pl-12 pr-16 py-4 text-lg bg-white/10 border border-white/20 rounded-xl text-white placeholder-purple-300 focus:outline-none focus:ring-2 focus:ring-purple-400 focus:border-transparent transition-all duration-200"
+                className={`w-full pl-12 pr-16 py-4 text-lg rounded-xl focus:outline-none focus:ring-2 focus:border-transparent transition-all duration-200 ${styles.searchInput}`}
                 placeholder="Search the web with Center-Deep..."
               />
               <button
                 type="submit"
-                className="absolute right-2 top-1/2 transform -translate-y-1/2 bg-gradient-to-r from-purple-600 to-blue-600 text-white px-6 py-2 rounded-lg hover:from-purple-700 hover:to-blue-700 transition-all duration-200 flex items-center gap-2"
+                className={`absolute right-2 top-1/2 transform -translate-y-1/2 text-white px-6 py-2 rounded-lg transition-all duration-200 flex items-center gap-2 ${styles.searchButton}`}
               >
                 <span>Search</span>
                 <ArrowRightIcon className="h-4 w-4" />
               </button>
             </div>
           </form>
-          <p className="text-center text-purple-300/70 text-sm mt-3">
+          <p className={`text-center text-sm mt-3 ${styles.footerText}`}>
             Powered by Center-Deep • AI-Enhanced • Private • Secure
           </p>
         </div>
@@ -182,7 +274,7 @@ export default function PublicLanding() {
         transition={{ duration: 0.6, delay: 0.4 }}
         className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mb-12"
       >
-        <h2 className="text-3xl font-bold text-white text-center mb-8">
+        <h2 className={`text-3xl font-bold text-center mb-8 ${currentTheme === 'unicorn' ? 'text-white' : theme.text.primary}`}>
           Quick Access
         </h2>
         
@@ -237,19 +329,21 @@ export default function PublicLanding() {
         transition={{ duration: 0.6, delay: 0.6 }}
         className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 mb-8"
       >
-        <div className="bg-white/5 backdrop-blur-xl rounded-xl border border-white/10 p-6 text-center">
+        <div className={`${styles.cardOverlay} rounded-xl p-6 text-center`}>
           <div className="flex items-center justify-center gap-2 mb-4">
-            <CogIcon className="h-6 w-6 text-purple-300" />
-            <h3 className="text-xl font-semibold text-white">System Administration</h3>
+            <CogIcon className={`h-6 w-6 ${currentTheme === 'unicorn' ? 'text-purple-300' : theme.text.accent}`} />
+            <h3 className={`text-xl font-semibold ${currentTheme === 'unicorn' ? 'text-white' : theme.text.primary}`}>
+              System Administration
+            </h3>
           </div>
           
-          <p className="text-purple-200/80 mb-4">
+          <p className={`${styles.subText} mb-4`}>
             Access the admin dashboard to manage your UC-1 Pro system
           </p>
           
           <button
             onClick={() => navigate('/admin')}
-            className="bg-gradient-to-r from-purple-600 to-blue-600 text-white px-8 py-3 rounded-lg hover:from-purple-700 hover:to-blue-700 transition-all duration-200 flex items-center gap-2 mx-auto"
+            className={`px-8 py-3 rounded-lg transition-all duration-200 flex items-center gap-2 mx-auto text-white ${styles.searchButton}`}
           >
             <CpuChipIcon className="h-5 w-5" />
             <span>Admin Dashboard</span>
@@ -259,18 +353,18 @@ export default function PublicLanding() {
       </motion.div>
 
       {/* Footer */}
-      <footer className="bg-black/20 backdrop-blur-sm border-t border-white/10 py-8 mt-16">
+      <footer className={`${styles.footerBg} py-8 mt-16`}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <MagicUnicornLogo className="w-8 h-8" />
-              <div className="text-purple-200">
+              <div className={styles.logoText}>
                 <div className="font-semibold">Magic Unicorn Unconventional Technology & Stuff Inc</div>
-                <div className="text-sm text-purple-300/70">UC-1 Pro v1.0.0</div>
+                <div className={`text-sm ${styles.footerText}`}>UC-1 Pro v1.0.0</div>
               </div>
             </div>
             
-            <div className="text-right text-purple-300/70 text-sm">
+            <div className={`text-right text-sm ${styles.footerText}`}>
               <div>Enterprise AI Infrastructure</div>
               <div>Powered by NVIDIA RTX 5090</div>
             </div>

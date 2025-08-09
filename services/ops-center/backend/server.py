@@ -883,7 +883,8 @@ async def list_services():
                 "cpu_percent": service['cpu_percent'],
                 "memory_mb": service['memory_mb'],
                 "uptime": service['uptime'],
-                "category": service['category'],
+                "type": service.get('type', 'core'),
+                "category": service.get('category', 'general'),
                 "container_name": service['container_name'],
                 "gpu_enabled": service['gpu_enabled'],
                 "image": service['image']

@@ -10,19 +10,14 @@ from typing import Dict, List, Any, Optional
 class SimpleDockerManager:
     def __init__(self):
         try:
-            # Try different Docker socket configurations
+            # Try Unix socket first (most common)
             self.docker_client = docker.DockerClient(base_url='unix://var/run/docker.sock')
             # Test the connection
             self.docker_client.ping()
         except Exception as e:
-            print(f"Docker client init failed: {e}")
-            try:
-                # Fallback to default
-                self.docker_client = docker.from_env()
-                self.docker_client.ping()
-            except Exception as e2:
-                print(f"Docker fallback also failed: {e2}")
-                self.docker_client = None
+            print(f"Warning: Docker client initialization failed: {e}")
+            # Set to None - we'll handle this gracefully in methods
+            self.docker_client = None
     
     def get_all_containers(self) -> List[Dict[str, Any]]:
         """Get all containers with basic info"""

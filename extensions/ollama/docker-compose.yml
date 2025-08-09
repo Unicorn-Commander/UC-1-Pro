@@ -1,15 +1,22 @@
+version: '3.8'
+
 services:
   ollama:
     image: ollama/ollama:latest
     container_name: unicorn-ollama
     hostname: unicorn-ollama
     ports:
-      - "11434:11434"
+      - "0.0.0.0:11434:11434"
     volumes:
       - ollama_models:/root/.ollama
       - /home/ucadmin/UC-1-Pro/volumes/ollama_models:/models
     environment:
+      - OLLAMA_HOST=0.0.0.0
+      - OLLAMA_ORIGINS=*
       - OLLAMA_MODELS=/models
+      - OLLAMA_NUM_PARALLEL=${OLLAMA_NUM_PARALLEL:-2}
+      - OLLAMA_MAX_LOADED_MODELS=${OLLAMA_MAX_LOADED_MODELS:-2}
+      - OLLAMA_KEEP_ALIVE=${OLLAMA_KEEP_ALIVE:-5m}
       - NVIDIA_VISIBLE_DEVICES=all
       - NVIDIA_DRIVER_CAPABILITIES=compute,utility
     deploy:
@@ -24,7 +31,16 @@ services:
       - unicorn-network
     labels:
       - "com.unicorn.service=ollama"
+      - "com.unicorn.type=extension"
+      - "com.unicorn.category=inference"
       - "com.unicorn.description=Ollama Model Server with NVIDIA GPU Support"
+      - "com.unicorn.port=11434"
+    healthcheck:
+      test: ["CMD-SHELL", "ollama list || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
 
 volumes:
   ollama_models:
