@@ -186,6 +186,7 @@ make comfyui       # Start ComfyUI for image generation
 
 UC-1 Pro includes optional extensions for additional functionality:
 
+- **🦙 Ollama** - Local LLM inference with GPU acceleration (port 11434)
 - **🎨 ComfyUI** - Flux image generation with Kontext support
 - **📊 Monitoring** - Prometheus + Grafana dashboards
 - **🔧 Dev Tools** - Jupyter Lab, VS Code Server, database admin
