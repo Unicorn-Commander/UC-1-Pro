@@ -63,25 +63,25 @@ const themes = {
     accent: 'yellow-400',
     background: 'bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900',
     sidebar: 'bg-gradient-to-b from-purple-900/95 via-blue-900/95 to-indigo-900/95 backdrop-blur-lg border-r border-white/20',
-    card: 'bg-white/10 backdrop-blur-lg border border-white/20 shadow-xl',
-    button: 'bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white shadow-lg',
+    card: 'bg-gradient-to-br from-purple-800/60 via-purple-700/50 to-indigo-800/60 backdrop-blur-lg border border-purple-400/30 shadow-xl',
+    button: 'bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white shadow-lg',
     text: {
       primary: 'text-white',
       secondary: 'text-purple-200',
-      accent: 'text-yellow-400',
-      logo: 'text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 via-pink-400 to-purple-400'
+      accent: 'text-yellow-300',
+      logo: 'text-transparent bg-clip-text bg-gradient-to-r from-yellow-300 via-purple-400 to-indigo-400'
     },
     status: {
-      success: 'text-green-400',
+      success: 'text-emerald-400',
       warning: 'text-yellow-400',
-      error: 'text-pink-400',
+      error: 'text-rose-400',
       info: 'text-cyan-400'
     }
   }
 };
 
 export function ThemeProvider({ children }) {
-  const [currentTheme, setCurrentTheme] = useState('dark'); // Default to Professional Dark theme
+  const [currentTheme, setCurrentTheme] = useState('unicorn'); // Default to Magic Unicorn theme
   const [isDarkMode, setIsDarkMode] = useState(true);
 
   useEffect(() => {
