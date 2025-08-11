@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
+import { useTheme } from '../contexts/ThemeContext';
 import {
   ChartPieIcon,
   ArrowPathIcon,
@@ -42,6 +43,7 @@ const itemVariants = {
 };
 
 export default function StorageBackup() {
+  const { theme, currentTheme } = useTheme();
   const [activeTab, setActiveTab] = useState('storage');
   const [storageData, setStorageData] = useState(null);
   const [backupData, setBackupData] = useState(null);

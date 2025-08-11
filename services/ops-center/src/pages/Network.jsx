@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
+import { useTheme } from '../contexts/ThemeContext';
 import { 
   WifiIcon, 
   GlobeAltIcon,
@@ -14,6 +15,7 @@ import {
 } from '@heroicons/react/24/outline';
 
 export default function Network() {
+  const { theme, currentTheme } = useTheme();
   const [networkStatus, setNetworkStatus] = useState(null);
   const [wifiNetworks, setWifiNetworks] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -235,10 +237,10 @@ export default function Network() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
+        <h1 className={`text-3xl font-bold ${theme.text.primary}`}>
           Network Configuration
         </h1>
-        <p className="mt-2 text-gray-600 dark:text-gray-400">
+        <p className={`mt-2 ${theme.text.secondary}`}>
           Manage network connections and settings
         </p>
       </div>
