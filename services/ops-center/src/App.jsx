@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, useLocation, Navigate } from 'react-router-dom';
 import PublicLanding from './pages/PublicLanding';
 import Dashboard from './pages/Dashboard';
+import DashboardPro from './pages/DashboardPro';
 import AIModelManagement from './pages/AIModelManagement';
 import Services from './pages/Services';
 import System from './pages/System';
@@ -108,7 +109,7 @@ function AppRoutes() {
             <AdminContent>
               <Layout>
                 <Routes>
-                  <Route path="/" element={<Dashboard />} />
+                  <Route path="/" element={<DashboardPro />} />
                   <Route path="/models" element={<AIModelManagement />} />
                   <Route path="/services" element={<Services />} />
                   <Route path="/system" element={<System />} />
