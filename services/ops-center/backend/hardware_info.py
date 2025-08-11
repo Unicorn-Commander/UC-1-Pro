@@ -116,38 +116,83 @@ class HardwareDetector:
         }
     
     def get_igpu_info(self) -> Dict[str, Any]:
-        """Get Intel integrated GPU information"""
+        """Get integrated GPU information (Intel or AMD)"""
         try:
-            # Check for Intel GPU
-            lspci_output = self._run_command("lspci | grep -i vga")
-            if lspci_output and "intel" in lspci_output.lower():
-                # Extract Intel GPU model
-                intel_match = re.search(r'Intel.*?(\w+.*Graphics.*?)(?:\s|$|\[)', lspci_output, re.IGNORECASE)
-                if intel_match:
-                    model = intel_match.group(1).strip()
-                else:
-                    model = "Intel Integrated Graphics"
-                
-                # Try to get driver version
-                try:
-                    glxinfo = self._run_command("glxinfo | grep 'OpenGL version'")
-                    if glxinfo:
-                        mesa_match = re.search(r'Mesa\s+([\d.]+)', glxinfo)
-                        driver = f"Mesa {mesa_match.group(1)}" if mesa_match else "Mesa (version unknown)"
+            # Check for any VGA/Display controller
+            lspci_output = self._run_command("lspci | grep -E '(VGA|Display|3D controller)'")
+            
+            if lspci_output:
+                # Check for Intel GPU
+                if "intel" in lspci_output.lower():
+                    # Extract Intel GPU model
+                    # Try to match patterns like "AlderLake-S GT1", "UHD Graphics 770", etc.
+                    intel_match = re.search(r'Intel Corporation\s+([^(\[]+)', lspci_output, re.IGNORECASE)
+                    if intel_match:
+                        model_text = intel_match.group(1).strip()
+                        # Clean up the model name
+                        if "Graphics" in model_text:
+                            model = f"Intel {model_text}"
+                        else:
+                            model = f"Intel {model_text}"
                     else:
-                        driver = "Mesa (version unknown)"
-                except:
-                    driver = "Unknown"
+                        # Fallback to generic
+                        model = "Intel Integrated Graphics"
+                    
+                    # Try to get driver version
+                    try:
+                        glxinfo = self._run_command("glxinfo | grep 'OpenGL version'")
+                        if glxinfo:
+                            mesa_match = re.search(r'Mesa\s+([\d.]+)', glxinfo)
+                            driver = f"Mesa {mesa_match.group(1)}" if mesa_match else "Mesa (version unknown)"
+                        else:
+                            # Try alternative: check for i915 driver
+                            modinfo = self._run_command("modinfo i915 | grep version:")
+                            if modinfo:
+                                driver = f"i915 {modinfo.strip().split(':')[-1].strip()}"
+                            else:
+                                driver = "i915 (version unknown)"
+                    except:
+                        driver = "Unknown"
+                    
+                    return {
+                        "model": model,
+                        "driver": driver
+                    }
                 
-                return {
-                    "model": model,
-                    "driver": driver
-                }
-        except:
-            pass
+                # Check for AMD GPU
+                elif "amd" in lspci_output.lower() or "radeon" in lspci_output.lower():
+                    # Extract AMD GPU model
+                    amd_match = re.search(r'AMD.*?:\s*([^(\[]+)', lspci_output, re.IGNORECASE)
+                    if amd_match:
+                        model = f"AMD {amd_match.group(1).strip()}"
+                    else:
+                        model = "AMD Integrated Graphics"
+                    
+                    # Try to get driver version
+                    try:
+                        glxinfo = self._run_command("glxinfo | grep 'OpenGL version'")
+                        if glxinfo:
+                            mesa_match = re.search(r'Mesa\s+([\d.]+)', glxinfo)
+                            driver = f"Mesa {mesa_match.group(1)}" if mesa_match else "Mesa (version unknown)"
+                        else:
+                            # Try alternative: check for amdgpu driver
+                            modinfo = self._run_command("modinfo amdgpu | grep version:")
+                            if modinfo:
+                                driver = f"amdgpu {modinfo.strip().split(':')[-1].strip()}"
+                            else:
+                                driver = "amdgpu (version unknown)"
+                    except:
+                        driver = "Unknown"
+                    
+                    return {
+                        "model": model,
+                        "driver": driver
+                    }
+        except Exception as e:
+            print(f"iGPU detection error: {e}")
         
         return {
-            "model": "No Intel GPU detected",
+            "model": "No iGPU detected",
             "driver": "N/A"
         }
     
