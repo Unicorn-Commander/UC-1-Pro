@@ -373,7 +373,7 @@ export default function Dashboard() {
             onClick={() => handleQuickAction('download-model')}
             className={`flex flex-col items-center gap-3 p-4 rounded-lg ${theme.button} hover:bg-purple-500/10 transition-all group border border-transparent hover:border-purple-500/30`}
           >
-            <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-pink-500 rounded-lg flex items-center justify-center group-hover:shadow-lg transition-shadow">
+            <div className="w-10 h-10 bg-gradient-to-br from-purple-600 to-indigo-600 rounded-lg flex items-center justify-center group-hover:shadow-lg transition-shadow">
               <CloudArrowDownIcon className="h-5 w-5 text-white" />
             </div>
             <span className="text-sm font-medium">Download Model</span>
