@@ -17,21 +17,44 @@
 
 ## 🎯 What is UC-1 Pro?
 
-UC-1 Pro is a production-ready, modular AI infrastructure stack that unleashes the full potential of NVIDIA RTX 5090 GPUs. Built by [Magic Unicorn Unconventional Technology & Stuff Inc](https://magicunicorn.tech), it provides enterprise-grade AI capabilities with the simplicity of a single command deployment.
+UC-1 Pro is a **production-ready, enterprise-grade AI infrastructure stack** that unleashes the full potential of NVIDIA RTX 5090 GPUs. Built by [Magic Unicorn Unconventional Technology & Stuff Inc](https://magicunicorn.tech), it provides professional AI capabilities with enterprise authentication, a modern Operations Center, and single-command deployment.
+
+### 🏆 **Current Status: Enterprise Authentication Ready**
+- ✅ **Enterprise SSO Support** - Microsoft 365, Google Workspace, LDAP/AD integration planned
+- ✅ **Professional Operations Center** - Modern dashboard with instant navigation and real-time monitoring
+- ✅ **Real Infrastructure Management** - Genuine Docker orchestration, model lifecycle, and service control
+- ✅ **Production Optimized** - Performance improvements, background data loading, non-blocking UI
 
 ### ✨ Key Features
 
-- **🚀 Blazing Fast Inference** - vLLM engine optimized for RTX 5090's 32GB VRAM
-- **🎙️ Advanced Speech Processing** - WhisperX STT with speaker diarization
-- **🗣️ Natural Voice Synthesis** - Kokoro TTS with multiple voice options
-- **🔍 Intelligent Search** - Self-hosted SearXNG with privacy protection
-- **📄 Document Intelligence** - OCR and document processing with Apache Tika
-- **🎨 Image Generation Ready** - ComfyUI extension for Flux models
+#### 🔐 **Enterprise Authentication (Coming Soon)**
+- **Microsoft 365/Entra ID** - Seamless Azure AD integration with group-based roles
+- **Google Workspace** - OAuth 2.0 with organizational unit mapping
+- **LDAP/Active Directory** - On-premise AD support with Kerberos/NTLM
+- **Unified SSO** - Single sign-on across all services including Open-WebUI
+- **RBAC** - Role-based access control with fine-grained permissions
+
+#### 🏢 **Enterprise Operations Center**
+- **Instant Navigation** - Non-blocking UI with background data loading
+- **Real Model Management** - Detect, activate, and delete vLLM/Ollama models
+- **Live Service Control** - Genuine Docker container orchestration
+- **Professional Dashboard** - Enterprise-ready design with Magic Unicorn theme
+- **Real-time Monitoring** - WebSocket-based system health updates
+
+#### ⚡ **AI Infrastructure**
+- **🚀 vLLM Engine** - Running Qwen2.5-32B-Instruct-AWQ optimized for RTX 5090's 32GB VRAM
+- **🦙 Ollama Integration** - 10+ models ready including Llama 3.2, Mistral, Gemma2, Qwen3
+- **🎙️ WhisperX STT** - Advanced speech processing with speaker diarization
+- **🗣️ Kokoro TTS** - Natural voice synthesis with Intel iGPU optimization
+- **🔍 Center-Deep Search** - Custom SearXNG fork with AI-powered tool servers
+- **📄 Apache Tika** - Document intelligence and OCR processing
+
+#### 🛠️ **System Features**
 - **📊 Built-in Monitoring** - Prometheus & Grafana for system insights
 - **🔒 Enterprise Security** - Automated backups, SSL support, API authentication
 - **🧩 Modular Architecture** - Enable only what you need
 - **⚡ Smart Health Checks** - Accurate service status monitoring
-- **📥 Model Pre-download** - Optional script to download models before startup
+- **📥 Model Management** - Download and manage AI models with progress tracking
 
 ## 📸 Operations Center Dashboard
 
@@ -99,9 +122,10 @@ UC-1 Pro includes a comprehensive web-based Operations Center for system adminis
 ### Prerequisites
 
 - Ubuntu 24.04 LTS (Secure Boot compatible)
-- NVIDIA RTX 5090 (32GB VRAM)
+- NVIDIA RTX 5090 (32GB VRAM) - Detected and configured ✅
 - 96GB RAM (minimum 64GB)
 - 200GB+ storage (500GB+ recommended for models)
+- Docker & NVIDIA Container Toolkit (auto-installed)
 
 ### Installation
 
@@ -139,22 +163,29 @@ Once running, access your AI services:
 <details>
 <summary>Click to expand architecture details</summary>
 
-UC-1 Pro uses a microservices architecture optimized for different hardware components:
+UC-1 Pro uses a microservices architecture with enterprise authentication gateway:
 
-### GPU Services (RTX 5090)
-- **vLLM** - High-performance LLM inference engine
+### Authentication Layer (New)
+- **Auth Gateway** - Unified SSO for all services
+- **Identity Providers** - Microsoft 365, Google, LDAP/AD
+- **Session Management** - Redis-backed JWT tokens
+- **RBAC Engine** - Role-based access control
+
+### GPU Services (RTX 5090 - 32GB)
+- **vLLM** - Running Qwen2.5-32B-Instruct-AWQ
 - **ComfyUI** (Extension) - Flux image generation
+- **Ollama** (Extension) - Additional model inference
 
-### CPU/Intel iGPU Services
+### CPU/Intel iGPU Services  
 - **WhisperX** - Speech-to-text processing
-- **Kokoro TTS** - Text-to-speech synthesis
-- **Embeddings** - Text vectorization
-- **Reranker** - Search result optimization
+- **Kokoro TTS** - Text-to-speech on Intel AlderLake-S GT1
+- **Embeddings** - BAAI/bge-base-en-v1.5
+- **Reranker** - BAAI/bge-reranker-v2-m3
 
 ### Data Layer
-- **PostgreSQL** - Relational data & metadata
-- **Redis** - High-speed caching & queuing
-- **Qdrant** - Vector database for RAG
+- **PostgreSQL 16** - User accounts, metadata, RBAC
+- **Redis 7.4** - Session store, caching, queuing
+- **Qdrant 1.15** - Vector database for RAG
 
 </details>
 
@@ -186,14 +217,15 @@ make comfyui       # Start ComfyUI for image generation
 
 UC-1 Pro includes optional extensions for additional functionality:
 
-- **🦙 Ollama** - Local LLM inference with GPU acceleration (port 11434)
+- **🦙 Ollama** - Local LLM inference with 10+ models ready (port 11434) ✅ Integrated
 - **🎨 ComfyUI** - Flux image generation with Kontext support
 - **📊 Monitoring** - Prometheus + Grafana dashboards
 - **🔧 Dev Tools** - Jupyter Lab, VS Code Server, database admin
-- **🐳 Portainer** - Visual Docker management interface at port 9444 (default: ucadmin/MagicUnicorn!8-)
-- **🔀 Traefik** - Reverse proxy with SSL termination
+- **🐳 Portainer** - Visual Docker management at port 9444 (ucadmin/MagicUnicorn!8-)
+- **🔀 Traefik** - Reverse proxy with SSL/Let's Encrypt
 - **⚡ Bolt.DIY** - Rapid AI app development
 - **🔄 n8n** - Workflow automation
+- **🔐 Keycloak** - Enterprise identity management (planned)
 
 Enable extensions as needed:
 ```bash
@@ -234,15 +266,37 @@ http://localhost:8084
 - **API Authentication** - Secure API keys for all endpoints
 - **Update Management** - Simple Docker-based updates
 
-## 📚 Documentation
+## 📚 Documentation & Roadmap
 
-Complete documentation is available at http://localhost:8081 after starting the stack, including:
+Complete documentation is available at http://localhost:8081 after starting the stack.
 
-- Getting Started Guide
-- Service Documentation
-- Configuration Reference
-- Troubleshooting Tips
-- API Documentation
+### 📋 **Key Documentation**
+- [DEVELOPMENT_CHECKLIST.md](DEVELOPMENT_CHECKLIST.md) - Complete development roadmap
+- [AUTHENTICATION_ROADMAP.md](AUTHENTICATION_ROADMAP.md) - Enterprise SSO implementation plan
+- [CLAUDE.md](CLAUDE.md) - Project context and architecture
+- API Documentation - Swagger UI at `/docs`
+
+### 🧪 **What's Actually Working**
+
+**Real Infrastructure Management:**
+- ✅ **Model Management** - Detect, activate, delete vLLM/Ollama models
+- ✅ **Service Control** - Real Docker container orchestration
+- ✅ **Network Configuration** - Interface detection, WiFi management
+- ✅ **System Monitoring** - Live hardware and resource tracking
+- ✅ **Backup System** - Functional backup and restore operations
+
+**Performance Optimizations:**
+- ✅ **Instant Navigation** - Non-blocking page transitions
+- ✅ **Background Loading** - APIs load after UI renders
+- ✅ **Request Timeouts** - Prevents hanging on slow endpoints
+- ✅ **Progressive Enhancement** - Content fills in as available
+
+Run the complete test suite:
+```bash
+./test_all_functionality.sh
+```
+
+View the detailed development checklist in [DEVELOPMENT_CHECKLIST.md](DEVELOPMENT_CHECKLIST.md)
 
 ## 🤝 Contributing
 
@@ -258,13 +312,20 @@ We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) f
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-## 🏢 About
+## 🏢 About Magic Unicorn Tech
 
 UC-1 Pro is developed by [Magic Unicorn Unconventional Technology & Stuff Inc](https://magicunicorn.tech), a company dedicated to making advanced AI technology accessible and practical for real-world applications. We believe in the power of open-source collaboration and building tools that empower developers and organizations to harness the full potential of modern AI hardware.
 
-### Why UC-1 Pro?
+### 🦄 Why UC-1 Pro?
 
-Born from the need for a production-ready AI stack that "just works," UC-1 Pro eliminates the complexity of integrating multiple AI services. Whether you're building the next generation of AI applications, running a research lab, or deploying enterprise AI solutions, UC-1 Pro provides the foundation you need to succeed.
+Born from the need for a production-ready AI stack that "just works," UC-1 Pro eliminates the complexity of integrating multiple AI services. Unlike typical admin panels with mock data, UC-1 Pro provides **genuine infrastructure management** with real Docker orchestration, actual model lifecycle control, and enterprise-grade authentication.
+
+### 🚀 What Makes Us Different
+
+- **Real Functionality** - Not just a pretty UI, but actual infrastructure control
+- **Enterprise Ready** - Built for business with SSO and RBAC on the roadmap
+- **RTX 5090 Optimized** - Maximizes your 32GB VRAM investment
+- **Magic Unicorn Edge** - Professional yet playful, serious yet approachable
 
 ---
 
@@ -274,6 +335,8 @@ Born from the need for a production-ready AI stack that "just works," UC-1 Pro e
 
 [⭐ Star this repo](https://github.com/Unicorn-Commander/UC-1-Pro) • [🚀 Get Started](#-quick-start) • [💬 Join our Community](https://github.com/Unicorn-Commander/UC-1-Pro/discussions)
 
-Built with ❤️ by [Magic Unicorn Tech](https://magicunicorn.tech)
+Built with ❤️ and 🦄 magic by [Magic Unicorn Tech](https://magicunicorn.tech)
+
+*Last Updated: August 12, 2025*
 
 </div>

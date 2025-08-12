@@ -29,6 +29,7 @@ import { useSystem } from '../contexts/SystemContext';
 import ModelSettingsForm from '../components/ModelSettingsForm';
 import modelApi from '../services/modelApi';
 import { serviceInfo, modelTips } from '../data/serviceInfo';
+import { SkeletonTable, SkeletonCard } from '../components/SkeletonCard';
 
 export default function AIModelManagement() {
   const { systemStatus } = useSystem();
@@ -47,7 +48,7 @@ export default function AIModelManagement() {
     embeddings: [], 
     reranker: [] 
   });
-  const [loadingModels, setLoadingModels] = useState(true);
+  const [loadingModels, setLoadingModels] = useState(false); // Start with instant display
   const [filters, setFilters] = useState({
     quantization: '',
     minSize: '',
@@ -163,8 +164,14 @@ export default function AIModelManagement() {
 
   // Load installed models and settings on mount
   useEffect(() => {
-    loadInstalledModels();
-    loadGlobalSettings();
+    // Allow page to render first, then load data
+    const timer = setTimeout(() => {
+      setLoadingModels(true);
+      loadInstalledModels();
+      loadGlobalSettings();
+    }, 200);
+    
+    return () => clearTimeout(timer);
   }, [loadInstalledModels]);
 
   // Reload models when tab changes

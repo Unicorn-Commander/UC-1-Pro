@@ -8,6 +8,7 @@ import json
 import asyncio
 import httpx
 import subprocess
+import re
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Optional, Any
@@ -183,13 +184,28 @@ class AIModelManager:
                         model_name = model_dir.name
                         display_name = model_name
                     
+                    # Check if this is the active model
+                    is_active = False
+                    try:
+                        env_path = "/home/ucadmin/UC-1-Pro/.env"
+                        if os.path.exists(env_path):
+                            with open(env_path, 'r') as f:
+                                for line in f:
+                                    if line.startswith('DEFAULT_LLM_MODEL='):
+                                        active_model = line.strip().split('=', 1)[1].strip('"')
+                                        is_active = (model_name == active_model)
+                                        break
+                    except Exception:
+                        pass
+                    
                     model_info = {
                         "id": model_name,
                         "name": display_name,
                         "path": str(model_dir),
                         "size": self._get_dir_size(model_dir),
                         "last_modified": datetime.fromtimestamp(model_dir.stat().st_mtime).isoformat(),
-                        "has_overrides": f"vllm:{model_name}" in self.settings.get("model_overrides", {})
+                        "has_overrides": f"vllm:{model_name}" in self.settings.get("model_overrides", {}),
+                        "active": is_active
                     }
                     models["vllm"].append(model_info)
         
@@ -373,33 +389,109 @@ class AIModelManager:
     
     async def activate_vllm_model(self, model_id: str) -> Dict:
         """Activate a vLLM model by updating environment and restarting service"""
-        # This would integrate with your Docker manager
-        # For now, return a placeholder
-        return {
-            "status": "activated",
-            "model_id": model_id,
-            "message": "Model activation requires Docker integration"
-        }
+        try:
+            # Check if model exists
+            model_found = False
+            for model_dir in Path(VLLM_MODELS_DIR).iterdir():
+                if model_dir.is_dir():
+                    if model_dir.name.startswith("models--"):
+                        check_name = model_dir.name.replace("models--", "").replace("--", "/")
+                    else:
+                        check_name = model_dir.name
+                    
+                    if check_name == model_id:
+                        model_found = True
+                        break
+            
+            if not model_found:
+                raise FileNotFoundError(f"Model not found: {model_id}")
+            
+            # Update .env file with new model
+            env_path = "/home/ucadmin/UC-1-Pro/.env"
+            if os.path.exists(env_path):
+                with open(env_path, 'r') as f:
+                    lines = f.readlines()
+                
+                # Update DEFAULT_LLM_MODEL
+                updated = False
+                for i, line in enumerate(lines):
+                    if line.startswith('DEFAULT_LLM_MODEL='):
+                        lines[i] = f'DEFAULT_LLM_MODEL={model_id}\n'
+                        updated = True
+                        break
+                
+                if not updated:
+                    lines.append(f'DEFAULT_LLM_MODEL={model_id}\n')
+                
+                with open(env_path, 'w') as f:
+                    f.writelines(lines)
+            
+            # Restart vLLM container
+            result = subprocess.run(
+                ["docker", "restart", "unicorn-vllm"],
+                capture_output=True,
+                text=True,
+                timeout=30
+            )
+            
+            if result.returncode == 0:
+                return {
+                    "status": "activated",
+                    "model_id": model_id,
+                    "message": f"Successfully activated {model_id}. vLLM service is restarting."
+                }
+            else:
+                raise Exception(f"Failed to restart vLLM: {result.stderr}")
+                
+        except Exception as e:
+            logger.error(f"Failed to activate model {model_id}: {e}")
+            return {
+                "status": "error",
+                "model_id": model_id,
+                "message": str(e)
+            }
     
     async def delete_model(self, model_id: str, backend: str) -> Dict:
         """Delete a model"""
         if backend == "vllm":
-            model_path = os.path.join(VLLM_MODELS_DIR, model_id.replace("/", "--"))
-            if os.path.exists(model_path):
-                import shutil
-                shutil.rmtree(model_path)
+            # Find the model directory
+            model_deleted = False
+            import shutil
+            
+            for model_dir in Path(VLLM_MODELS_DIR).iterdir():
+                if model_dir.is_dir():
+                    if model_dir.name.startswith("models--"):
+                        check_name = model_dir.name.replace("models--", "").replace("--", "/")
+                    else:
+                        check_name = model_dir.name
+                    
+                    if check_name == model_id:
+                        shutil.rmtree(str(model_dir))
+                        model_deleted = True
+                        break
+            
+            if model_deleted:
                 return {"status": "deleted", "model_id": model_id}
             else:
                 raise FileNotFoundError(f"Model not found: {model_id}")
         
         elif backend == "ollama":
-            # Use Ollama API to delete
-            async with httpx.AsyncClient() as client:
-                response = await client.delete(f"http://localhost:11434/api/delete/{model_id}")
-                if response.status_code == 200:
+            # Use Ollama CLI to delete
+            try:
+                result = subprocess.run(
+                    ["docker", "exec", "unicorn-ollama", "ollama", "rm", model_id],
+                    capture_output=True,
+                    text=True,
+                    timeout=30
+                )
+                
+                if result.returncode == 0 or "deleted" in result.stdout.lower():
                     return {"status": "deleted", "model_id": model_id}
                 else:
-                    raise Exception(f"Failed to delete Ollama model: {response.text}")
+                    raise Exception(f"Failed to delete Ollama model: {result.stderr}")
+            except Exception as e:
+                logger.error(f"Failed to delete Ollama model {model_id}: {e}")
+                raise
         
         else:
             raise ValueError(f"Invalid backend: {backend}")

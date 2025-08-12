@@ -19,11 +19,14 @@ export function SystemProvider({ children }) {
   const [error, setError] = useState(null);
   const [wsConnected, setWsConnected] = useState(false);
 
-  // Fetch initial data
+  // Allow instant navigation by not blocking on initial load
   useEffect(() => {
-    fetchSystemStatus();
-    fetchServices();
-    fetchModels();
+    setLoading(false);
+    
+    // Fetch data in background with staggered timing
+    setTimeout(() => fetchSystemStatus(), 200);
+    setTimeout(() => fetchServices(), 400);
+    setTimeout(() => fetchModels(), 600);
   }, []);
 
   // Setup WebSocket connection
@@ -91,31 +94,46 @@ export function SystemProvider({ children }) {
 
   const fetchSystemStatus = async () => {
     try {
-      const response = await fetch('/api/v1/system/status');
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 8000);
+      
+      const response = await fetch('/api/v1/system/status', {
+        signal: controller.signal
+      });
+      clearTimeout(timeoutId);
+      
       if (!response.ok) {
         const text = await response.text();
         throw new Error(`Failed to fetch system status: ${response.status} - ${text}`);
       }
       const data = await response.json();
       setSystemStatus(data);
-      setError(null); // Clear any previous errors
+      setError(null);
     } catch (err) {
-      console.error('System status fetch error:', err);
-      setError(err.message);
-      setLoading(false);
+      if (err.name !== 'AbortError') {
+        console.error('System status fetch error:', err);
+        // Don't set global error for timeouts/network issues
+      }
     }
   };
 
   const fetchServices = async () => {
     try {
-      const response = await fetch('/api/v1/services');
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 8000);
+      
+      const response = await fetch('/api/v1/services', {
+        signal: controller.signal
+      });
+      clearTimeout(timeoutId);
+      
       if (!response.ok) throw new Error('Failed to fetch services');
       const data = await response.json();
       setServices(data);
     } catch (err) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
+      if (err.name !== 'AbortError') {
+        console.error('Failed to fetch services:', err);
+      }
     }
   };
 
