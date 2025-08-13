@@ -1,0 +1,88 @@
+version: '3.8'
+
+services:
+  traefik:
+    image: traefik:v3.0
+    container_name: unicorn-traefik
+    restart: unless-stopped
+    command:
+      # Enable Docker provider
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--providers.docker.network=unicorn-network"
+      
+      # Enable file provider for dynamic configuration
+      - "--providers.file.directory=/etc/traefik/dynamic"
+      - "--providers.file.watch=true"
+      
+      # Entry points
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.websecure.address=:443"
+      
+      # API and dashboard
+      - "--api.dashboard=true"
+      - "--api.debug=true"
+      
+      # Logging
+      - "--log.level=INFO"
+      - "--accesslog=true"
+      
+      # Metrics (optional)
+      - "--metrics.prometheus=true"
+      - "--metrics.prometheus.buckets=0.1,0.3,1.2,5.0"
+    
+    ports:
+      - "80:80"
+      - "443:443"
+      - "8090:8080"  # Traefik dashboard
+    
+    environment:
+      # Authentik configuration
+      AUTHENTIK_HOST: http://authentik-server:9000
+      AUTHENTIK_TOKEN: ${AUTHENTIK_API_TOKEN:-}
+    
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./config:/etc/traefik/dynamic:ro
+      - ./certs:/certs:ro
+      - traefik_data:/data
+    
+    networks:
+      - unicorn-network
+    
+    labels:
+      # Traefik dashboard authentication
+      - "traefik.enable=true"
+      - "traefik.http.routers.dashboard.rule=Host(`traefik.localhost`)"
+      - "traefik.http.routers.dashboard.service=api@internal"
+      - "traefik.http.routers.dashboard.middlewares=authentik@docker"
+      - "traefik.http.routers.dashboard.entrypoints=web"
+
+  # Authentik Proxy Outpost
+  authentik-proxy:
+    image: ghcr.io/goauthentik/proxy:2024.8.3
+    container_name: authentik-proxy
+    restart: unless-stopped
+    environment:
+      AUTHENTIK_HOST: http://authentik-server:9000
+      AUTHENTIK_INSECURE: "true"
+      AUTHENTIK_TOKEN: ${AUTHENTIK_PROXY_TOKEN}
+    ports:
+      - "9876:9876"  # Proxy port for ForwardAuth
+    networks:
+      - unicorn-network
+    depends_on:
+      - traefik
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.services.authentik-proxy.loadbalancer.server.port=9876"
+      - "traefik.http.routers.authentik-proxy.rule=PathPrefix(`/outpost.goauthentik.io`)"
+      - "traefik.http.routers.authentik-proxy.entrypoints=web"
+
+networks:
+  unicorn-network:
+    external: true
+
+volumes:
+  traefik_data:
+    driver: local

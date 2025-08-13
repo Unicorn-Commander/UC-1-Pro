@@ -1,0 +1,201 @@
+# Traefik Service Routing Configuration
+# Routes UC-1 Pro services through Authentik authentication
+
+http:
+  routers:
+    # Open-WebUI - Main chat interface (authenticated users)
+    open-webui:
+      rule: "Host(`chat.localhost`) || Host(`webui.localhost`)"
+      entryPoints:
+        - web
+      middlewares:
+        - authentik-user
+        - security-headers
+        - rate-limit
+      service: open-webui
+    
+    # Ops Center - Admin dashboard (admins only)
+    ops-center:
+      rule: "Host(`admin.localhost`) || Host(`ops.localhost`)"
+      entryPoints:
+        - web
+      middlewares:
+        - authentik-admin
+        - security-headers
+      service: ops-center
+    
+    # vLLM API - LLM inference (developers and admins)
+    vllm-api:
+      rule: "Host(`api.localhost`) && PathPrefix(`/v1`)"
+      entryPoints:
+        - web
+      middlewares:
+        - authentik-developer
+        - cors
+        - rate-limit
+      service: vllm
+    
+    # Center-Deep Search - AI search (authenticated users)
+    search:
+      rule: "Host(`search.localhost`)"
+      entryPoints:
+        - web
+      middlewares:
+        - authentik-user
+        - security-headers
+      service: center-deep
+    
+    # Documentation - Public access
+    docs:
+      rule: "Host(`docs.localhost`)"
+      entryPoints:
+        - web
+      middlewares:
+        - security-headers
+      service: documentation
+    
+    # Grafana Monitoring - Admin only
+    grafana:
+      rule: "Host(`grafana.localhost`) || Host(`monitoring.localhost`)"
+      entryPoints:
+        - web
+      middlewares:
+        - authentik-admin
+        - security-headers
+      service: grafana
+    
+    # Prometheus Metrics - Admin only
+    prometheus:
+      rule: "Host(`prometheus.localhost`) || Host(`metrics.localhost`)"
+      entryPoints:
+        - web
+      middlewares:
+        - authentik-admin
+        - security-headers
+      service: prometheus
+    
+    # Qdrant Vector DB - Developer access
+    qdrant:
+      rule: "Host(`vectors.localhost`) || Host(`qdrant.localhost`)"
+      entryPoints:
+        - web
+      middlewares:
+        - authentik-developer
+        - security-headers
+      service: qdrant
+    
+    # WhisperX STT - API access for developers
+    whisperx:
+      rule: "Host(`stt.localhost`) || Host(`whisper.localhost`)"
+      entryPoints:
+        - web
+      middlewares:
+        - authentik-developer
+        - cors
+      service: whisperx
+    
+    # Kokoro TTS - API access for developers
+    kokoro:
+      rule: "Host(`tts.localhost`) || Host(`kokoro.localhost`)"
+      entryPoints:
+        - web
+      middlewares:
+        - authentik-developer
+        - cors
+      service: kokoro
+    
+    # Embeddings Service - Developer access
+    embeddings:
+      rule: "Host(`embeddings.localhost`)"
+      entryPoints:
+        - web
+      middlewares:
+        - authentik-developer
+        - cors
+      service: embeddings
+    
+    # Reranker Service - Developer access
+    reranker:
+      rule: "Host(`reranker.localhost`)"
+      entryPoints:
+        - web
+      middlewares:
+        - authentik-developer
+        - cors
+      service: reranker
+    
+    # Authentik Admin - Public (has own auth)
+    authentik:
+      rule: "Host(`auth.localhost`) || Host(`sso.localhost`)"
+      entryPoints:
+        - web
+      middlewares:
+        - security-headers
+      service: authentik
+
+  services:
+    # Service definitions pointing to actual containers
+    open-webui:
+      loadBalancer:
+        servers:
+          - url: "http://unicorn-open-webui:8080"
+    
+    ops-center:
+      loadBalancer:
+        servers:
+          - url: "http://unicorn-ops-center:8084"
+    
+    vllm:
+      loadBalancer:
+        servers:
+          - url: "http://unicorn-vllm:8000"
+    
+    center-deep:
+      loadBalancer:
+        servers:
+          - url: "http://unicorn-searxng:8890"
+    
+    documentation:
+      loadBalancer:
+        servers:
+          - url: "http://unicorn-docs:80"
+    
+    grafana:
+      loadBalancer:
+        servers:
+          - url: "http://unicorn-grafana:3000"
+    
+    prometheus:
+      loadBalancer:
+        servers:
+          - url: "http://unicorn-prometheus:9090"
+    
+    qdrant:
+      loadBalancer:
+        servers:
+          - url: "http://unicorn-qdrant:6333"
+    
+    whisperx:
+      loadBalancer:
+        servers:
+          - url: "http://unicorn-whisperx:9000"
+    
+    kokoro:
+      loadBalancer:
+        servers:
+          - url: "http://unicorn-kokoro:8880"
+    
+    embeddings:
+      loadBalancer:
+        servers:
+          - url: "http://unicorn-embeddings:8082"
+    
+    reranker:
+      loadBalancer:
+        servers:
+          - url: "http://unicorn-reranker:8080"
+    
+    authentik:
+      loadBalancer:
+        servers:
+          - url: "http://authentik-server:9000"

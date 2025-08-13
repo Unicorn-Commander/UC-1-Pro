@@ -1,0 +1,122 @@
+# Microsoft 365/Entra ID Provider Blueprint
+# This blueprint sets up Microsoft 365 SSO integration
+
+version: 1
+metadata:
+  name: Microsoft 365 Provider
+  labels:
+    blueprints.goauthentik.io/description: |
+      Microsoft 365/Entra ID OAuth2 provider for enterprise authentication
+    blueprints.goauthentik.io/system: "false"
+
+context:
+  # These will be provided via environment variables
+  microsoft_client_id: !Env AZURE_CLIENT_ID
+  microsoft_client_secret: !Env AZURE_CLIENT_SECRET
+  microsoft_tenant_id: !Env AZURE_TENANT_ID
+
+entries:
+  # Microsoft OAuth2 Source
+  - model: authentik_sources_oauth.oauthsource
+    id: microsoft-oauth-source
+    attrs:
+      name: "Microsoft 365"
+      slug: "microsoft"
+      enabled: true
+      authentication_flow: !Find [authentik_flows.flow, [slug, default-source-authentication]]
+      enrollment_flow: !Find [authentik_flows.flow, [slug, default-source-enrollment]]
+      policy_engine_mode: all
+      user_matching_mode: email_link
+      provider_type: "microsoft"
+      request_token_url: "https://login.microsoftonline.com/{{ microsoft_tenant_id }}/oauth2/v2.0/authorize"
+      access_token_url: "https://login.microsoftonline.com/{{ microsoft_tenant_id }}/oauth2/v2.0/token"
+      profile_url: "https://graph.microsoft.com/v1.0/me"
+      consumer_key: "{{ microsoft_client_id }}"
+      consumer_secret: "{{ microsoft_client_secret }}"
+      additional_scopes: "User.Read Groups.Read.All"
+      group_claim: "groups"
+
+  # Property Mapping for Microsoft Groups
+  - model: authentik_sources_oauth.oauthsourcepropertymapping
+    id: microsoft-groups-mapping
+    attrs:
+      name: "Microsoft 365 Groups"
+      source: !Find [authentik_sources_oauth.oauthsource, [slug, microsoft]]
+      expression: |
+        # Map Microsoft 365 groups to UC-1 Pro groups
+        microsoft_groups = request.context.get('groups', [])
+        uc1_groups = []
+        
+        # Domain admins -> UC-1 Admins
+        if 'Domain Admins' in microsoft_groups or 'Global Administrators' in microsoft_groups:
+            uc1_groups.append('uc1-admins')
+        
+        # IT groups -> Developers
+        elif any(group in microsoft_groups for group in ['IT Department', 'Developers', 'DevOps']):
+            uc1_groups.append('uc1-developers')
+        
+        # Regular users
+        elif 'Domain Users' in microsoft_groups:
+            uc1_groups.append('uc1-users')
+        
+        # Default to viewer if no matches
+        if not uc1_groups:
+            uc1_groups.append('uc1-viewers')
+        
+        return uc1_groups
+
+  # User Property Mapping
+  - model: authentik_sources_oauth.oauthsourcepropertymapping
+    id: microsoft-user-mapping
+    attrs:
+      name: "Microsoft 365 User Properties"
+      source: !Find [authentik_sources_oauth.oauthsource, [slug, microsoft]]
+      expression: |
+        return {
+            'username': request.context.get('userPrincipalName', '').split('@')[0],
+            'email': request.context.get('mail', request.context.get('userPrincipalName', '')),
+            'name': request.context.get('displayName', ''),
+            'first_name': request.context.get('givenName', ''),
+            'last_name': request.context.get('surname', ''),
+            'attributes': {
+                'department': request.context.get('department', ''),
+                'job_title': request.context.get('jobTitle', ''),
+                'office_location': request.context.get('officeLocation', ''),
+                'employee_id': request.context.get('employeeId', ''),
+                'manager': request.context.get('manager', {}).get('displayName', ''),
+                'microsoft_tenant': "{{ microsoft_tenant_id }}",
+                'auth_source': 'microsoft365'
+            }
+        }
+
+  # Application for UC-1 Pro
+  - model: authentik_core.application
+    id: uc1-pro-app
+    attrs:
+      name: "UC-1 Pro"
+      slug: "uc1-pro"
+      provider: !Find [authentik_providers_oauth2.oauth2provider, [name, UC-1 Pro OAuth2]]
+      meta_launch_url: "http://localhost:8084"
+      meta_description: "UC-1 Pro Enterprise AI Infrastructure Platform"
+      meta_publisher: "Magic Unicorn Unconventional Technology & Stuff Inc"
+      meta_icon: "data:image/svg+xml;base64,🦄"
+
+  # OAuth2 Provider for UC-1 Pro
+  - model: authentik_providers_oauth2.oauth2provider
+    id: uc1-pro-oauth-provider
+    attrs:
+      name: "UC-1 Pro OAuth2"
+      client_type: "confidential"
+      client_id: "uc1-pro-client"
+      authorization_flow: !Find [authentik_flows.flow, [slug, default-provider-authorization-explicit-consent]]
+      property_mappings:
+        - !Find [authentik_providers_oauth2.scopemapping, [scope_name, openid]]
+        - !Find [authentik_providers_oauth2.scopemapping, [scope_name, email]]
+        - !Find [authentik_providers_oauth2.scopemapping, [scope_name, profile]]
+      redirect_uris: |
+        http://localhost:8084/auth/callback
+        http://localhost:9000/auth/callback
+        http://admin.localhost/auth/callback
+      include_claims_in_id_token: true
+      issuer_mode: "per_provider"
+      sub_mode: "hashed_user_id"

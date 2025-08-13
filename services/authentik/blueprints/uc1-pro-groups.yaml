@@ -1,0 +1,102 @@
+# UC-1 Pro Default Groups and Roles
+# This blueprint creates the default groups for UC-1 Pro
+
+version: 1
+metadata:
+  name: UC-1 Pro Default Groups
+  labels:
+    blueprints.goauthentik.io/description: |
+      Default groups and permissions for UC-1 Pro enterprise AI platform
+    blueprints.goauthentik.io/system: "true"
+
+entries:
+  # Admin Group - Full Access
+  - model: authentik_core.group
+    id: uc1-admins
+    attrs:
+      name: "UC-1 Admins"
+      is_superuser: true
+      attributes:
+        description: "Full system administrators with access to all UC-1 Pro services"
+        uc1_permissions:
+          - "admin:*"
+          - "models:*"
+          - "services:*"
+          - "users:*"
+          - "system:*"
+        uc1_services:
+          - "ops-center"
+          - "open-webui"
+          - "vllm"
+          - "ollama"
+          - "center-deep"
+          - "monitoring"
+
+  # Developer Group - Development Access
+  - model: authentik_core.group
+    id: uc1-developers
+    attrs:
+      name: "UC-1 Developers"
+      is_superuser: false
+      attributes:
+        description: "Developers with access to AI models, services, and development tools"
+        uc1_permissions:
+          - "models:read,deploy,delete"
+          - "services:read,restart,logs"
+          - "system:read,monitor"
+          - "users:read_self,update_self"
+        uc1_services:
+          - "ops-center"
+          - "open-webui"
+          - "vllm"
+          - "ollama"
+          - "center-deep"
+
+  # User Group - Standard Access
+  - model: authentik_core.group
+    id: uc1-users
+    attrs:
+      name: "UC-1 Users"
+      is_superuser: false
+      attributes:
+        description: "Standard users with access to AI services and chat interfaces"
+        uc1_permissions:
+          - "models:read,use"
+          - "services:read_status"
+          - "users:read_self,update_self"
+        uc1_services:
+          - "open-webui"
+          - "center-deep"
+
+  # Viewer Group - Read-Only Access
+  - model: authentik_core.group
+    id: uc1-viewers
+    attrs:
+      name: "UC-1 Viewers"
+      is_superuser: false
+      attributes:
+        description: "Read-only access to dashboards and reports"
+        uc1_permissions:
+          - "system:read"
+          - "models:read"
+          - "services:read_status"
+          - "users:read_self"
+        uc1_services:
+          - "ops-center:readonly"
+
+  # Magic Unicorn Employees - Special Access
+  - model: authentik_core.group
+    id: magic-unicorn-staff
+    attrs:
+      name: "Magic Unicorn Staff"
+      is_superuser: false
+      attributes:
+        description: "Magic Unicorn Unconventional Technology & Stuff Inc employees"
+        uc1_permissions:
+          - "admin:*"
+          - "models:*"
+          - "services:*"
+          - "system:*"
+        email_domains:
+          - "magicunicorn.tech"
+        auto_assign: true

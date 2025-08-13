@@ -3,7 +3,9 @@
 ## 🎯 Project Status: Professional Enterprise-Ready Operations Center
 **Current Phase**: Systematic Development & Quality Assurance
 **Last Updated**: August 12, 2025
-**Authentication Priority**: HIGH - Enterprise SSO required for production deployment
+**Current Sprint**: Authentik SSO Implementation (Week 1 of 3)
+**Status**: 85% → 95% (adding enterprise authentication)
+**ETA**: Enterprise SSO ready in 2-3 weeks
 
 ## 📋 Development Phases
 
@@ -86,50 +88,68 @@
 - [x] **System configuration** - Hardware detection working
 - [ ] **Authentication flow** 🚧
 
-### Phase 6: Enterprise Authentication & Identity Management 🚧 PRIORITY
-#### Authentication Providers
-- [ ] **Microsoft 365/Entra ID (Azure AD) Integration**
-  - [ ] OAuth 2.0/OIDC implementation
-  - [ ] Microsoft Graph API integration
-  - [ ] Automatic user provisioning from M365
-  - [ ] Group-based role mapping
+### Phase 6: Enterprise Authentication & Identity Management 🚀 IN PROGRESS
+#### Authentik SSO Implementation (CHOSEN SOLUTION)
+- [x] **Solution Selected: Authentik** - Modern, API-first, Docker-native
+- [ ] **Core Authentik Deployment** 🔄 IN PROGRESS
+  - [ ] Docker Compose integration
+  - [ ] PostgreSQL database setup
+  - [ ] Redis session store
+  - [ ] Initial admin configuration
+- [ ] **Microsoft 365/Entra ID Integration**
+  - [ ] Authentik OAuth2 provider setup
+  - [ ] Azure AD application registration
+  - [ ] Group mapping configuration
+  - [ ] Testing with M365 accounts
 - [ ] **Google Workspace Integration**
-  - [ ] Google OAuth 2.0 implementation
-  - [ ] Google Directory API integration
-  - [ ] Organizational unit mapping
-  - [ ] Google Groups to roles mapping
+  - [ ] Google OAuth2 provider in Authentik
+  - [ ] Workspace domain configuration
+  - [ ] Google Groups synchronization
+  - [ ] Testing with Google accounts
 - [ ] **LDAP/Active Directory Integration**
-  - [ ] LDAP authentication module
-  - [ ] AD group synchronization
-  - [ ] Kerberos/NTLM support
-  - [ ] LDAPS (LDAP over SSL) support
-- [ ] **SAML 2.0 Support**
-  - [ ] Generic SAML IdP integration
-  - [ ] Okta integration
-  - [ ] OneLogin support
-  - [ ] Ping Identity support
+  - [ ] Authentik LDAP provider
+  - [ ] AD domain controller connection
+  - [ ] Group synchronization
+  - [ ] Testing with AD accounts
+- [ ] **Local Accounts System**
+  - [ ] User registration flow
+  - [ ] Email verification
+  - [ ] Password policies
+  - [ ] Self-service password reset
 
-#### User Management
-- [ ] **Local User Accounts**
-  - [ ] Self-registration with email verification
-  - [ ] Password policies and complexity rules
-  - [ ] Two-factor authentication (TOTP/WebAuthn)
-  - [ ] Password reset flow
-- [ ] **Unified Authentication Gateway**
-  - [ ] Single sign-on for all services
-  - [ ] Session management across services
-  - [ ] Open-WebUI authentication proxy
-  - [ ] API authentication tokens
-- [ ] **Role-Based Access Control (RBAC)**
-  - [ ] Predefined roles (Admin, Developer, User, Viewer)
-  - [ ] Custom role creation
-  - [ ] Fine-grained permissions
-  - [ ] Service-level access control
+#### Service Integration & Proxying
+- [ ] **Traefik Auth Middleware** 🔄 IN PROGRESS
+  - [ ] ForwardAuth integration with Authentik
+  - [ ] Service-specific auth rules
+  - [ ] JWT token validation
+  - [ ] Session cookie management
+- [ ] **Open-WebUI Integration**
+  - [ ] User provisioning from SSO
+  - [ ] Role mapping (Admin/User)
+  - [ ] Session synchronization
+  - [ ] Database user creation
+- [ ] **UC-1 Pro Services Auth**
+  - [ ] vLLM API bearer token auth
+  - [ ] Ollama proxy authentication
+  - [ ] Center-Deep user context
+  - [ ] Operations Center RBAC
+
+#### Role-Based Access Control (RBAC)
+- [ ] **Authentik Groups & Roles**
+  - [ ] Admin group (full access)
+  - [ ] Developer group (models, services, logs)
+  - [ ] User group (AI services only)
+  - [ ] Viewer group (read-only)
+- [ ] **Permission Mapping**
+  - [ ] Service-level permissions
+  - [ ] API endpoint restrictions
+  - [ ] UI feature toggles
+  - [ ] Resource quotas
 - [ ] **Organization Management**
-  - [ ] Auto-detection from email domain
-  - [ ] Organization-based default roles
-  - [ ] Department/team hierarchy
-  - [ ] Resource quotas per organization
+  - [ ] Domain-based auto-assignment
+  - [ ] Department hierarchy
+  - [ ] Cross-organization policies
+  - [ ] Resource isolation
 
 #### Security & Compliance
 - [ ] **Audit Logging**
@@ -247,55 +267,55 @@
 
 ## 🚀 Next Development Sprint
 
-### Immediate Priorities (Current Sprint)
-1. **Fix Model Management Issues**
-   - Debug API timeout issues
-   - Ensure model detection works
-   - Fix activation/deletion functions
-   - Add error recovery
+### Immediate Priorities (Current Sprint - Week 1)
+1. **Authentik Deployment** 🚀 STARTING NOW
+   - Add Authentik to docker-compose.yml
+   - Configure PostgreSQL database
+   - Set up Redis for sessions
+   - Create initial admin account
 
-2. **Authentication Foundation**
-   - Design authentication architecture
-   - Create auth service/middleware
-   - Implement JWT token system
-   - Build session management
+2. **Basic SSO Foundation**
+   - Configure Authentik default flows
+   - Set up local user accounts
+   - Test basic authentication
+   - Create user registration flow
 
-3. **Microsoft 365 Integration**
+3. **Traefik Integration**
+   - Add Traefik reverse proxy
+   - Configure ForwardAuth middleware
+   - Protect Operations Center
+   - Test auth flow
+
+4. **Microsoft 365 Quick Start**
    - Register Azure AD application
-   - Implement MSAL authentication
-   - Add Graph API integration
-   - Map AD groups to roles
+   - Configure OAuth2 provider in Authentik
+   - Test M365 login flow
+   - Map basic user attributes
 
-4. **Google Workspace Integration**
-   - Set up Google Cloud project
-   - Implement Google OAuth
-   - Add Directory API access
-   - Map Google groups to roles
+### Sprint 2 Priorities (Weeks 2-3)
+1. **Identity Provider Setup**
+   - Complete Microsoft 365 integration
+   - Add Google Workspace support
+   - Configure LDAP/AD connection
+   - Test all authentication flows
 
-### Sprint 2 Priorities
-1. **LDAP/AD Integration**
-   - Build LDAP connector
-   - Add AD authentication
-   - Implement group sync
-   - Test with common LDAP servers
+2. **Service Integration**
+   - Deploy Traefik auth middleware
+   - Integrate Open-WebUI user system
+   - Add auth to vLLM and Ollama APIs
+   - Protect Operations Center routes
 
-2. **User Registration & Management**
-   - Create registration UI
-   - Add email verification
-   - Build profile management
-   - Implement password reset
+3. **User Experience**
+   - Create unified login page
+   - Add organization auto-detection
+   - Implement role-based UI features
+   - Add user profile management
 
-3. **Unified Authentication**
-   - Create auth proxy for Open-WebUI
-   - Implement SSO across services
-   - Add session synchronization
-   - Build logout coordination
-
-4. **RBAC Implementation**
-   - Define permission model
-   - Create role management UI
-   - Implement access checks
-   - Add audit logging
+4. **Testing & Validation**
+   - Test SSO flows end-to-end
+   - Validate role assignments
+   - Check session synchronization
+   - Performance test auth middleware
 
 ## 🎯 Success Criteria
 

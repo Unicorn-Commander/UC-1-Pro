@@ -23,6 +23,16 @@ help:
 	@echo "  make ext-list    - List available extensions"
 	@echo "  make monitoring  - Start monitoring extension"
 	@echo "  make comfyui     - Start ComfyUI extension"
+	@echo ""
+	@echo "Authentication (SSO):"
+	@echo "  make auth-start      - Start Authentik SSO"
+	@echo "  make auth-stop       - Stop Authentik SSO"
+	@echo "  make auth-logs       - View Authentik logs"
+	@echo "  make auth-test       - Test Authentik integration"
+	@echo "  make auth-setup-m365 - Configure Microsoft 365"
+	@echo "  make auth-setup-google - Configure Google Workspace"
+	@echo "  make auth-test-m365  - Test Microsoft 365 SSO"
+	@echo "  make auth-test-google - Test Google SSO"
 
 start:
 	@./start.sh
@@ -144,3 +154,51 @@ info:
 	@echo "Portainer started at http://localhost:9000"
 	@echo "Username: admin"
 	@echo "Password: $$(cat extensions/portainer/portainer_password.txt)"
+# Authentik SSO Commands
+.PHONY: auth-start auth-stop auth-restart auth-logs auth-status auth-test auth-setup-m365
+
+auth-start:
+	@echo "🔐 Starting Authentik SSO services..."
+	@cd services/authentik && docker-compose --env-file ../../.env up -d
+
+auth-stop:
+	@echo "🔐 Stopping Authentik SSO services..."
+	@cd services/authentik && docker-compose stop
+
+auth-restart:
+	@echo "🔐 Restarting Authentik SSO services..."
+	@cd services/authentik && docker-compose restart
+
+auth-logs:
+	@echo "🔐 Showing Authentik SSO logs..."
+	@cd services/authentik && docker-compose logs -f
+
+auth-status:
+	@echo "🔐 Authentik SSO service status:"
+	@cd services/authentik && docker-compose ps
+
+auth-test:
+	@echo "🔐 Testing Authentik SSO integration..."
+	@./scripts/test-authentik.sh
+
+auth-setup-m365:
+	@echo "🔐 Configuring Microsoft 365 SSO..."
+	@./scripts/configure-microsoft365-sso.sh
+
+auth-setup-google:
+	@echo "🔐 Configuring Google Workspace SSO..."
+	@./scripts/configure-google-sso.sh
+
+auth-test-google:
+	@echo "🔐 Testing Google Workspace SSO..."
+	@./scripts/test-google-sso.sh
+
+auth-test-m365:
+	@echo "🔐 Testing Microsoft 365 SSO..."
+	@./scripts/test-microsoft365-sso.sh
+
+# Legacy aliases
+authentik-start: auth-start
+authentik-stop: auth-stop
+authentik-logs: auth-logs
+sso: auth-start

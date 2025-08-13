@@ -1,0 +1,119 @@
+version: '3.8'
+
+services:
+  authentik-postgresql:
+    image: docker.io/library/postgres:16-alpine
+    container_name: authentik-postgresql
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -d $${POSTGRES_DB} -U $${POSTGRES_USER}"]
+      start_period: 20s
+      interval: 30s
+      retries: 5
+      timeout: 5s
+    volumes:
+      - authentik_database:/var/lib/postgresql/data
+    environment:
+      POSTGRES_PASSWORD: ${AUTHENTIK_POSTGRESQL_PASSWORD}
+      POSTGRES_USER: ${AUTHENTIK_POSTGRESQL_USER:-authentik}
+      POSTGRES_DB: ${AUTHENTIK_POSTGRESQL_NAME:-authentik}
+    networks:
+      - authentik-internal
+
+  authentik-redis:
+    image: docker.io/library/redis:alpine
+    container_name: authentik-redis
+    command: --save 60 1 --loglevel warning
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli ping | grep PONG"]
+      start_period: 20s
+      interval: 30s
+      retries: 5
+      timeout: 3s
+    volumes:
+      - authentik_redis:/data
+    networks:
+      - authentik-internal
+
+  authentik-server:
+    image: ghcr.io/goauthentik/server:2024.8.3
+    container_name: authentik-server
+    restart: unless-stopped
+    command: server
+    environment:
+      AUTHENTIK_REDIS__HOST: authentik-redis
+      AUTHENTIK_POSTGRESQL__HOST: authentik-postgresql
+      AUTHENTIK_POSTGRESQL__USER: ${AUTHENTIK_POSTGRESQL_USER:-authentik}
+      AUTHENTIK_POSTGRESQL__NAME: ${AUTHENTIK_POSTGRESQL_NAME:-authentik}
+      AUTHENTIK_POSTGRESQL__PASSWORD: ${AUTHENTIK_POSTGRESQL_PASSWORD}
+      AUTHENTIK_SECRET_KEY: ${AUTHENTIK_SECRET_KEY}
+      AUTHENTIK_ERROR_REPORTING__ENABLED: false
+      # Initial admin user
+      AUTHENTIK_BOOTSTRAP_PASSWORD: ${AUTHENTIK_BOOTSTRAP_PASSWORD:-MagicUnicorn!Auth}
+      AUTHENTIK_BOOTSTRAP_TOKEN: ${AUTHENTIK_BOOTSTRAP_TOKEN}
+      AUTHENTIK_BOOTSTRAP_EMAIL: ${AUTHENTIK_BOOTSTRAP_EMAIL:-admin@magicunicorn.tech}
+      # UC-1 Pro specific settings
+      AUTHENTIK_COOKIE_DOMAIN: ${UC1_PRO_DOMAIN:-localhost}
+      AUTHENTIK_DEFAULT_USER_CHANGE_NAME: true
+      AUTHENTIK_DEFAULT_USER_CHANGE_EMAIL: true
+      AUTHENTIK_DEFAULT_USER_CHANGE_USERNAME: true
+      AUTHENTIK_GDPR_COMPLIANCE: true
+    volumes:
+      - authentik_media:/media
+      - authentik_templates:/templates
+    ports:
+      - "0.0.0.0:9005:9000"
+      - "0.0.0.0:9445:9443"
+    depends_on:
+      - authentik-postgresql
+      - authentik-redis
+    networks:
+      - authentik-internal
+      - unicorn-network
+
+  authentik-worker:
+    image: ghcr.io/goauthentik/server:2024.8.3
+    container_name: authentik-worker
+    restart: unless-stopped
+    command: worker
+    environment:
+      AUTHENTIK_REDIS__HOST: authentik-redis
+      AUTHENTIK_POSTGRESQL__HOST: authentik-postgresql
+      AUTHENTIK_POSTGRESQL__USER: ${AUTHENTIK_POSTGRESQL_USER:-authentik}
+      AUTHENTIK_POSTGRESQL__NAME: ${AUTHENTIK_POSTGRESQL_NAME:-authentik}
+      AUTHENTIK_POSTGRESQL__PASSWORD: ${AUTHENTIK_POSTGRESQL_PASSWORD}
+      AUTHENTIK_SECRET_KEY: ${AUTHENTIK_SECRET_KEY}
+      AUTHENTIK_ERROR_REPORTING__ENABLED: false
+    # This is optional, and can be removed. If you remove this, the following will happen
+    # - The permissions for the /media folders aren't fixed, so make sure they are 1000:1000
+    # - The docker socket can't be accessed from within the container
+    user: root
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - authentik_media:/media
+      - authentik_certs:/certs
+      - authentik_templates:/templates
+    depends_on:
+      - authentik-postgresql
+      - authentik-redis
+    networks:
+      - authentik-internal
+
+volumes:
+  authentik_database:
+    driver: local
+  authentik_redis:
+    driver: local
+  authentik_media:
+    driver: local
+  authentik_templates:
+    driver: local
+  authentik_certs:
+    driver: local
+
+networks:
+  authentik-internal:
+    driver: bridge
+  unicorn-network:
+    external: true
