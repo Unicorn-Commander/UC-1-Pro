@@ -13,6 +13,8 @@ from typing import Dict, List, Optional, Any
 from datetime import datetime, timedelta, timezone
 from pydantic import BaseModel, Field, validator
 import bcrypt
+import asyncio
+from concurrent.futures import ThreadPoolExecutor
 
 class User(BaseModel):
     """User model"""
@@ -203,9 +205,20 @@ class AuthManager:
         salt = bcrypt.gensalt()
         return bcrypt.hashpw(password.encode('utf-8'), salt).decode('utf-8')
     
-    def _verify_password(self, plain_password: str, hashed_password: str) -> bool:
-        """Verify a password against its hash"""
+    def _verify_password_sync(self, plain_password: str, hashed_password: str) -> bool:
+        """Verify a password against its hash (sync version)"""
         return bcrypt.checkpw(plain_password.encode('utf-8'), hashed_password.encode('utf-8'))
+    
+    async def _verify_password(self, plain_password: str, hashed_password: str) -> bool:
+        """Verify a password against its hash (async version)"""
+        loop = asyncio.get_event_loop()
+        with ThreadPoolExecutor() as executor:
+            return await loop.run_in_executor(
+                executor, 
+                self._verify_password_sync,
+                plain_password, 
+                hashed_password
+            )
     
     def _generate_user_id(self) -> str:
         """Generate a unique user ID"""
@@ -256,7 +269,7 @@ class AuthManager:
         
         return user.dict()
     
-    def authenticate_user(self, credentials: LoginCredentials) -> Optional[Dict[str, Any]]:
+    async def authenticate_user(self, credentials: LoginCredentials) -> Optional[Dict[str, Any]]:
         """Authenticate a user with username and password"""
         # Find user by username
         user_data = None
@@ -268,8 +281,8 @@ class AuthManager:
         if not user_data:
             return None
         
-        # Verify password
-        if not self._verify_password(credentials.password, user_data.get('password_hash', '')):
+        # Verify password (async to prevent blocking)
+        if not await self._verify_password(credentials.password, user_data.get('password_hash', '')):
             return None
         
         # Update last login
@@ -280,9 +293,9 @@ class AuthManager:
         user = {k: v for k, v in user_data.items() if k != 'password_hash'}
         return user
     
-    def login(self, credentials: LoginCredentials, request_info: Dict[str, str]) -> Token:
+    async def login(self, credentials: LoginCredentials, request_info: Dict[str, str]) -> Token:
         """Login and create access token"""
-        user = self.authenticate_user(credentials)
+        user = await self.authenticate_user(credentials)
         if not user:
             raise ValueError("Invalid username or password")
         

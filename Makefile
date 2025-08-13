@@ -1,6 +1,6 @@
 # UC-1 Pro Makefile for common operations
 
-.PHONY: help start stop restart status logs health gpu-status clean backup update build test-services
+.PHONY: help start stop restart status ports logs health gpu-status clean backup update build test-services
 
 help:
 	@echo "UC-1 Pro Management Commands"
@@ -9,6 +9,7 @@ help:
 	@echo "  make stop        - Stop all services"
 	@echo "  make restart     - Restart all services"
 	@echo "  make status      - Show service status"
+	@echo "  make ports       - Show port allocations"
 	@echo "  make logs        - Follow logs (all services)"
 	@echo "  make health      - Run health check"
 	@echo "  make gpu-status  - Show GPU usage"
@@ -25,14 +26,19 @@ help:
 	@echo "  make comfyui     - Start ComfyUI extension"
 	@echo ""
 	@echo "Authentication (SSO):"
-	@echo "  make auth-start      - Start Authentik SSO"
-	@echo "  make auth-stop       - Stop Authentik SSO"
-	@echo "  make auth-logs       - View Authentik logs"
-	@echo "  make auth-test       - Test Authentik integration"
-	@echo "  make auth-setup-m365 - Configure Microsoft 365"
-	@echo "  make auth-setup-google - Configure Google Workspace"
-	@echo "  make auth-test-m365  - Test Microsoft 365 SSO"
-	@echo "  make auth-test-google - Test Google SSO"
+	@echo "  make auth-start         - Start Authentik SSO"
+	@echo "  make auth-stop          - Stop Authentik SSO"
+	@echo "  make auth-logs          - View Authentik logs"
+	@echo "  make auth-test          - Test Authentik integration"
+	@echo "  make auth-configure-apps - Configure apps in Authentik"
+	@echo "  make auth-enable-oauth  - Enable OAuth for Open-WebUI"
+	@echo "  make auth-setup-m365    - Configure Microsoft 365"
+	@echo "  make auth-setup-google  - Configure Google Workspace"
+	@echo ""
+	@echo "Traefik Proxy:"
+	@echo "  make traefik-start      - Start Traefik proxy"
+	@echo "  make traefik-stop       - Stop Traefik proxy"
+	@echo "  make traefik-logs       - View Traefik logs"
 
 start:
 	@./start.sh
@@ -45,6 +51,14 @@ restart:
 
 status:
 	@docker-compose ps
+
+ports:
+	@echo "🔌 UC-1 Pro Port Allocations:"
+	@echo ""
+	@docker ps --format "table {{.Names}}\t{{.Ports}}" | grep -E "unicorn-|authentik-|traefik" | head -20
+	@echo ""
+	@echo "📋 For complete port map: cat PORT_ALLOCATION.md"
+	@echo "🔍 Check specific port: sudo lsof -i :PORT"
 
 logs:
 	@docker-compose logs -f
@@ -196,6 +210,34 @@ auth-test-google:
 auth-test-m365:
 	@echo "🔐 Testing Microsoft 365 SSO..."
 	@./scripts/test-microsoft365-sso.sh
+
+auth-configure-apps:
+	@echo "🔐 Configuring Authentik applications..."
+	@./scripts/configure-authentik-apps.sh
+
+auth-enable-oauth:
+	@echo "🔐 Enabling OAuth for Open-WebUI..."
+	@sed -i 's/# ENABLE_OAUTH_SIGNUP:/ENABLE_OAUTH_SIGNUP:/g' docker-compose.yml
+	@sed -i 's/# OAUTH_MERGE_ACCOUNTS_BY_EMAIL:/OAUTH_MERGE_ACCOUNTS_BY_EMAIL:/g' docker-compose.yml
+	@sed -i 's/# OPENID_PROVIDER_URL:/OPENID_PROVIDER_URL:/g' docker-compose.yml
+	@sed -i 's/# OPENID_CLIENT_ID:/OPENID_CLIENT_ID:/g' docker-compose.yml
+	@sed -i 's/# OPENID_CLIENT_SECRET:/OPENID_CLIENT_SECRET:/g' docker-compose.yml
+	@sed -i 's/# OPENID_REDIRECT_URI:/OPENID_REDIRECT_URI:/g' docker-compose.yml
+	@sed -i 's/# OPENID_SCOPE:/OPENID_SCOPE:/g' docker-compose.yml
+	@sed -i 's/# OPENID_PROVIDER_DISPLAY_NAME:/OPENID_PROVIDER_DISPLAY_NAME:/g' docker-compose.yml
+	@echo "✅ OAuth enabled - restart Open-WebUI: docker-compose restart open-webui"
+
+traefik-start:
+	@echo "🔐 Starting Traefik reverse proxy..."
+	@cd services/traefik && docker-compose --env-file ../../.env up -d
+
+traefik-stop:
+	@echo "🔐 Stopping Traefik..."
+	@cd services/traefik && docker-compose stop
+
+traefik-logs:
+	@echo "🔐 Viewing Traefik logs..."
+	@cd services/traefik && docker-compose logs -f
 
 # Legacy aliases
 authentik-start: auth-start

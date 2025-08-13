@@ -29,7 +29,7 @@ import { useSystem } from '../contexts/SystemContext';
 import ModelSettingsForm from '../components/ModelSettingsForm';
 import modelApi from '../services/modelApi';
 import { serviceInfo, modelTips } from '../data/serviceInfo';
-import { SkeletonTable, SkeletonCard } from '../components/SkeletonCard';
+import SkeletonCard, { SkeletonTable } from '../components/SkeletonCard';
 
 export default function AIModelManagement() {
   const { systemStatus } = useSystem();

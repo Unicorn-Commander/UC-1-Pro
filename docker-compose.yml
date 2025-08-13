@@ -286,6 +286,15 @@ services:
       ENABLE_MODEL_FILTER: "false"
       MODEL_FILTER_LIST: ""
       ENABLE_OLLAMA_API: "false"
+      # OAuth/SSO Configuration (Optional - uncomment to enable)
+      # ENABLE_OAUTH_SIGNUP: "${ENABLE_OAUTH_SIGNUP:-false}"
+      # OAUTH_MERGE_ACCOUNTS_BY_EMAIL: "${OAUTH_MERGE_ACCOUNTS_BY_EMAIL:-true}"
+      # OPENID_PROVIDER_URL: "${OPENID_PROVIDER_URL:-http://authentik-server:9000/application/o/open-webui/}"
+      # OPENID_CLIENT_ID: "${OPENWEBUI_OAUTH_CLIENT_ID:-open-webui}"
+      # OPENID_CLIENT_SECRET: "${OPENWEBUI_OAUTH_CLIENT_SECRET:-}"
+      # OPENID_REDIRECT_URI: "${OPENID_REDIRECT_URI:-http://localhost:8080/oauth/oidc/callback}"
+      # OPENID_SCOPE: "${OPENID_SCOPE:-openid profile email groups}"
+      # OPENID_PROVIDER_DISPLAY_NAME: "${OPENID_PROVIDER_DISPLAY_NAME:-UC-1 Pro SSO}"
     networks:
       unicorn-network:
         aliases:

@@ -29,7 +29,18 @@ def get_running_services() -> List[Dict[str, Any]]:
         
         # Extension Services
         'unicorn-ollama': {'name': 'ollama', 'display_name': 'Ollama', 'port': '11434', 'type': 'extension', 'category': 'inference'},
-        'unicorn-ollama-webui': {'name': 'ollama-webui', 'display_name': 'Ollama WebUI', 'port': '11435', 'type': 'extension', 'category': 'interface'}
+        'unicorn-ollama-webui': {'name': 'ollama-webui', 'display_name': 'Ollama WebUI', 'port': '11435', 'type': 'extension', 'category': 'interface'},
+        
+        # Authentication Services (Authentik SSO)
+        'authentik-server': {'name': 'authentik-server', 'display_name': 'Authentik SSO', 'port': '9000', 'type': 'extension', 'category': 'authentication'},
+        'authentik-worker': {'name': 'authentik-worker', 'display_name': 'Authentik Worker', 'port': '', 'type': 'extension', 'category': 'authentication'},
+        'authentik-postgresql': {'name': 'authentik-db', 'display_name': 'Authentik Database', 'port': '5432', 'type': 'extension', 'category': 'authentication'},
+        'authentik-redis': {'name': 'authentik-cache', 'display_name': 'Authentik Cache', 'port': '6379', 'type': 'extension', 'category': 'authentication'},
+        'authentik-proxy': {'name': 'authentik-proxy', 'display_name': 'Authentik Proxy', 'port': '9876', 'type': 'extension', 'category': 'authentication'},
+        
+        # Traefik Reverse Proxy
+        'traefik': {'name': 'traefik', 'display_name': 'Traefik Proxy', 'port': '80', 'type': 'extension', 'category': 'proxy'},
+        'traefik-dashboard': {'name': 'traefik-api', 'display_name': 'Traefik Dashboard', 'port': '8080', 'type': 'extension', 'category': 'proxy'}
     }
     
     try:
@@ -74,37 +85,40 @@ def get_running_services() -> List[Dict[str, Any]]:
         for container_name, service_info in service_map.items():
             status = running_containers.get(container_name, 'stopped')
             
-            # Get basic stats for running containers
+            # Get basic stats for running containers (optimized for speed)
             cpu_percent = 0
             memory_mb = 0
             
-            if status in ['running', 'unhealthy']:
-                try:
-                    stats_result = subprocess.run([
-                        'docker', 'stats', '--no-stream', '--format', 
-                        '{{.CPUPerc}}|{{.MemUsage}}', container_name
-                    ], capture_output=True, text=True, timeout=5)
-                    
-                    if stats_result.returncode == 0 and '|' in stats_result.stdout:
-                        stats_parts = stats_result.stdout.strip().split('|')
-                        if len(stats_parts) >= 2:
-                            cpu_str = stats_parts[0].replace('%', '').strip()
-                            mem_str = stats_parts[1].split('/')[0].strip()
-                            
-                            try:
-                                cpu_percent = float(cpu_str)
-                            except:
-                                cpu_percent = 0
-                                
-                            # Parse memory (handle MiB/GiB)
-                            if 'GiB' in mem_str:
-                                memory_mb = float(mem_str.replace('GiB', '')) * 1024
-                            elif 'MiB' in mem_str:
-                                memory_mb = float(mem_str.replace('MiB', ''))
-                            else:
-                                memory_mb = 0
-                except:
-                    pass
+            # Skip individual docker stats calls to improve performance
+            # Individual stats collection was taking 5+ seconds per container
+            # TODO: Implement batch stats collection or use Docker API directly
+            # if status in ['running', 'unhealthy']:
+            #     try:
+            #         stats_result = subprocess.run([
+            #             'docker', 'stats', '--no-stream', '--format', 
+            #             '{{.CPUPerc}}|{{.MemUsage}}', container_name
+            #         ], capture_output=True, text=True, timeout=2)
+            #         
+            #         if stats_result.returncode == 0 and '|' in stats_result.stdout:
+            #             stats_parts = stats_result.stdout.strip().split('|')
+            #             if len(stats_parts) >= 2:
+            #                 cpu_str = stats_parts[0].replace('%', '').strip()
+            #                 mem_str = stats_parts[1].split('/')[0].strip()
+            #                 
+            #                 try:
+            #                     cpu_percent = float(cpu_str)
+            #                 except:
+            #                     cpu_percent = 0
+            #                     
+            #                 # Parse memory (handle MiB/GiB)
+            #                 if 'GiB' in mem_str:
+            #                     memory_mb = float(mem_str.replace('GiB', '')) * 1024
+            #                 elif 'MiB' in mem_str:
+            #                     memory_mb = float(mem_str.replace('MiB', ''))
+            #                 else:
+            #                     memory_mb = 0
+            #     except:
+            #         pass
             
             services.append({
                 'name': service_info['name'],

@@ -14,6 +14,7 @@ import {
   PuzzlePieceIcon,
   DocumentTextIcon,
   ShieldCheckIcon,
+  KeyIcon,
   ArrowRightOnRectangleIcon,
   UserCircleIcon
 } from '@heroicons/react/24/outline';
@@ -29,6 +30,7 @@ const navigation = [
   { name: 'Storage', href: '/admin/storage', icon: ArchiveBoxIcon },
   { name: 'Logs', href: '/admin/logs', icon: DocumentTextIcon },
   { name: 'Security', href: '/admin/security', icon: ShieldCheckIcon },
+  { name: 'Authentication', href: '/admin/authentication', icon: KeyIcon },
   { name: 'Extensions', href: '/admin/extensions', icon: PuzzlePieceIcon },
   { name: 'Settings', href: '/admin/settings', icon: CogIcon },
 ];

@@ -579,13 +579,20 @@ def calculate_model_memory(model_size_str: str, quantization: str, context_size:
     # Add overhead (20% for safety)
     total_memory_gb = (model_memory_gb + context_memory_gb) * 1.2
     
-    # Get available GPU memory
+    # Get available GPU memory using nvidia-smi instead of GPUtil
     try:
-        gpus = GPUtil.getGPUs()
-        if gpus:
-            available_memory_gb = gpus[0].memoryFree / 1024
-            total_gpu_memory_gb = gpus[0].memoryTotal / 1024
-            usage_percentage = (total_memory_gb / total_gpu_memory_gb) * 100
+        result = subprocess.run(['nvidia-smi', '--query-gpu=memory.free,memory.total', '--format=csv,noheader,nounits'], 
+                              capture_output=True, text=True, timeout=2)
+        if result.returncode == 0:
+            parts = result.stdout.strip().split(', ')
+            if len(parts) >= 2:
+                available_memory_gb = float(parts[0]) / 1024
+                total_gpu_memory_gb = float(parts[1]) / 1024
+                usage_percentage = (total_memory_gb / total_gpu_memory_gb) * 100
+            else:
+                available_memory_gb = 32  # Default for RTX 5090
+                total_gpu_memory_gb = 32
+                usage_percentage = (total_memory_gb / total_gpu_memory_gb) * 100
         else:
             available_memory_gb = 32  # Default for RTX 5090
             total_gpu_memory_gb = 32
@@ -728,9 +735,9 @@ async def download_model_with_progress(model_id: str, quantization: Optional[str
 async def get_system_status():
     """Get current system resource usage"""
     try:
-        # CPU info
-        cpu_percent = psutil.cpu_percent(interval=1)
-        cpu_percent_per_core = psutil.cpu_percent(interval=1, percpu=True)
+        # CPU info - use non-blocking calls
+        cpu_percent = psutil.cpu_percent(interval=0)  # Non-blocking
+        cpu_percent_per_core = psutil.cpu_percent(interval=0, percpu=True)  # Non-blocking
         cpu_count = psutil.cpu_count()
         
         # Memory info
@@ -739,33 +746,44 @@ async def get_system_status():
         # Disk info
         disk = psutil.disk_usage('/')
         
-        # GPU info (if available)
+        # GPU info (if available) - skip GPUtil for now as it might be blocking
         gpu_info = []
+        # Temporarily disable GPUtil calls to fix performance
+        # try:
+        #     gpus = GPUtil.getGPUs()
+        #     for gpu in gpus:
+        #         gpu_info.append({
+        #             "name": gpu.name,
+        #             "utilization": round(gpu.load * 100, 1),
+        #             "memory_used": int(gpu.memoryUsed * 1024 * 1024),  # Convert to bytes
+        #             "memory_total": int(gpu.memoryTotal * 1024 * 1024),  # Convert to bytes
+        #             "temperature": gpu.temperature,
+        #             "power_draw": getattr(gpu, 'powerDraw', 0),
+        #             "power_limit": getattr(gpu, 'powerLimit', 0)
+        #         })
+        # except Exception as e:
+        #     print(f"GPU info error: {e}")
+        
+        # Use nvidia-smi for GPU info instead
         try:
-            gpus = GPUtil.getGPUs()
-            for gpu in gpus:
-                gpu_info.append({
-                    "name": gpu.name,
-                    "utilization": round(gpu.load * 100, 1),
-                    "memory_used": int(gpu.memoryUsed * 1024 * 1024),  # Convert to bytes
-                    "memory_total": int(gpu.memoryTotal * 1024 * 1024),  # Convert to bytes
-                    "temperature": gpu.temperature,
-                    "power_draw": getattr(gpu, 'powerDraw', 0),
-                    "power_limit": getattr(gpu, 'powerLimit', 0)
-                })
+            result = subprocess.run(['nvidia-smi', '--query-gpu=name,utilization.gpu,memory.used,memory.total,temperature.gpu,power.draw,power.limit', 
+                                   '--format=csv,noheader,nounits'], 
+                                  capture_output=True, text=True, timeout=2)
+            if result.returncode == 0:
+                for line in result.stdout.strip().split('\n'):
+                    parts = line.split(', ')
+                    if len(parts) >= 7:
+                        gpu_info.append({
+                            "name": parts[0],
+                            "utilization": float(parts[1]) if parts[1] != '[N/A]' else 0,
+                            "memory_used": int(float(parts[2]) * 1024 * 1024) if parts[2] != '[N/A]' else 0,
+                            "memory_total": int(float(parts[3]) * 1024 * 1024) if parts[3] != '[N/A]' else 0,
+                            "temperature": float(parts[4]) if parts[4] != '[N/A]' else 0,
+                            "power_draw": float(parts[5]) if parts[5] != '[N/A]' else 0,
+                            "power_limit": float(parts[6]) if parts[6] != '[N/A]' else 0
+                        })
         except Exception as e:
             print(f"GPU info error: {e}")
-            # Add mock GPU data for development
-            if os.environ.get('DEVELOPMENT', 'false').lower() == 'true':
-                gpu_info.append({
-                    "name": "NVIDIA GeForce RTX 5090 (Mock)",
-                    "utilization": 45.5,
-                    "memory_used": 8589934592,  # 8GB
-                    "memory_total": 34359738368,  # 32GB
-                    "temperature": 65,
-                    "power_draw": 250,
-                    "power_limit": 450
-                })
         
         # Get CPU frequency
         cpu_freq = psutil.cpu_freq()
@@ -777,27 +795,29 @@ async def get_system_status():
         boot_time = psutil.boot_time()
         uptime = int(time.time() - boot_time)
         
-        # Get top processes
+        # Get top processes - skip for performance
         processes = []
-        try:
-            for proc in psutil.process_iter(['pid', 'name', 'cpu_percent', 'memory_info', 'status']):
-                try:
-                    pinfo = proc.info
-                    processes.append({
-                        'pid': pinfo['pid'],
-                        'name': pinfo['name'],
-                        'cpu_percent': pinfo['cpu_percent'] or 0,
-                        'memory_mb': pinfo['memory_info'].rss / (1024 * 1024) if pinfo['memory_info'] else 0,
-                        'status': pinfo['status']
-                    })
-                except (psutil.NoSuchProcess, psutil.AccessDenied):
-                    pass
-            
-            # Sort by CPU usage and take top 10
-            processes.sort(key=lambda x: x['cpu_percent'], reverse=True)
-            processes = processes[:10]
-        except Exception as e:
-            print(f"Error getting processes: {e}")
+        # Skip process enumeration for now to improve performance
+        # This was causing significant delays in the API response
+        # try:
+        #     for proc in psutil.process_iter(['pid', 'name', 'cpu_percent', 'memory_info', 'status']):
+        #         try:
+        #             pinfo = proc.info
+        #             processes.append({
+        #                 'pid': pinfo['pid'],
+        #                 'name': pinfo['name'],
+        #                 'cpu_percent': pinfo['cpu_percent'] or 0,
+        #                 'memory_mb': pinfo['memory_info'].rss / (1024 * 1024) if pinfo['memory_info'] else 0,
+        #                 'status': pinfo['status']
+        #             })
+        #         except (psutil.NoSuchProcess, psutil.AccessDenied):
+        #             pass
+        #     
+        #     # Sort by CPU usage and take top 10
+        #     processes.sort(key=lambda x: x['cpu_percent'], reverse=True)
+        #     processes = processes[:10]
+        # except Exception as e:
+        #     print(f"Error getting processes: {e}")
         
         return {
             "cpu": {
@@ -1916,7 +1936,7 @@ async def login(credentials: LoginCredentials, request: Request):
             "user_agent": request.headers.get("user-agent", "unknown")
         }
         
-        token = auth_manager.login(credentials, request_info)
+        token = await auth_manager.login(credentials, request_info)
         return token
     except ValueError as e:
         raise HTTPException(status_code=401, detail=str(e))
@@ -2114,13 +2134,22 @@ async def serve_admin(path: str = ""):
     else:
         raise HTTPException(status_code=404, detail="Admin interface not found")
 
-# Mount static files at the end
-# Only mount static files if dist directory exists
-import os
-if os.path.exists("dist"):
-    app.mount("/", StaticFiles(directory="dist", html=True), name="static")
-elif os.path.exists("../dist"):
-    app.mount("/", StaticFiles(directory="../dist", html=True), name="static")
+# Serve the React app for all non-API routes
+@app.get("/{full_path:path}")
+async def serve_spa(full_path: str):
+    """Serve the React app for all routes"""
+    # Check if requesting a static file
+    if full_path.startswith("assets/") or full_path.endswith((".js", ".css", ".png", ".jpg", ".svg", ".ico")):
+        file_path = os.path.join("dist", full_path)
+        if os.path.exists(file_path):
+            return FileResponse(file_path)
+    
+    # For all other routes, return the index.html (for React Router)
+    index_path = "dist/index.html"
+    if os.path.exists(index_path):
+        return FileResponse(index_path)
+    else:
+        raise HTTPException(status_code=404, detail="Frontend not found")
 
 if __name__ == "__main__":
     import uvicorn

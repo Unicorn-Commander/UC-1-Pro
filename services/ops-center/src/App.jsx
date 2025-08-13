@@ -12,6 +12,7 @@ import StorageBackup from './pages/StorageBackup';
 import Extensions from './pages/Extensions';
 import Logs from './pages/Logs';
 import Security from './pages/Security';
+import Authentication from './pages/Authentication';
 import Login from './pages/Login';
 import Layout from './components/Layout';
 import ErrorBoundary from './components/ErrorBoundary';
@@ -118,6 +119,7 @@ function AppRoutes() {
                   <Route path="/extensions" element={<Extensions />} />
                   <Route path="/logs" element={<Logs />} />
                   <Route path="/security" element={<Security />} />
+                  <Route path="/authentication" element={<Authentication />} />
                   <Route path="/settings" element={<Settings />} />
                 </Routes>
               </Layout>
