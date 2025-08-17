@@ -329,7 +329,26 @@ services:
           - tika
           - ocr
 
-  # --- Self-hosted Search: Center-Deep (Custom SearXNG) ---
+  # --- SearXNG Backend (Internal Only) ---
+  unicorn-searxng-backend:
+    build: ./services/searxng
+    container_name: unicorn-searxng-backend
+    restart: unless-stopped
+    environment:
+      - SEARXNG_SECRET=${SEARXNG_SECRET}
+      - REDIS_URL=redis://unicorn-redis:6379/1
+    volumes:
+      - ./services/searxng/settings.yml:/etc/searxng/settings.yml:ro
+      - ./services/searxng/limiter.toml:/etc/searxng/limiter.toml:ro
+    networks:
+      unicorn-network:
+        aliases:
+          - searxng-backend
+    depends_on:
+      redis:
+        condition: service_healthy
+
+  # --- Self-hosted Search: Center-Deep (Frontend) ---
   unicorn-searxng:
     build: ./Center-Deep
     container_name: unicorn-searxng
@@ -352,6 +371,7 @@ services:
       - ADMIN_PASSWORD=${ADMIN_PASSWORD:-MagicUnicorn!8-)}
       - SECRET_KEY=${SEARXNG_SECRET}
       - REDIS_URL=redis://unicorn-redis:6379/2
+      - SEARXNG_BACKEND_URL=http://unicorn-searxng-backend:8080
       - LLM_ENDPOINT=${LLM_ENDPOINT:-http://unicorn-vllm:8000/v1}
       - LLM_API_KEY=${VLLM_API_KEY:-dummy-key}
       - LLM_MODEL=${DEFAULT_LLM_MODEL:-Qwen/Qwen2.5-32B-Instruct-AWQ}
@@ -360,6 +380,8 @@ services:
         condition: service_healthy
       vllm:
         condition: service_healthy
+      unicorn-searxng-backend:
+        condition: service_started
 
   # --- GPU Monitoring ---
   gpu-exporter:

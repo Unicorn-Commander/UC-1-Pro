@@ -1,0 +1,128 @@
+# Center-Deep Pro Configuration Options
+# This file provides different options for running Center-Deep in UC-1 Pro
+
+version: '3.8'
+
+services:
+  # Option 1: Build from local directory (current setup - for development)
+  # Use this when you have Center-Deep cloned locally and want to make changes
+  unicorn-searxng-local:
+    build: ./Center-Deep
+    container_name: unicorn-searxng
+    restart: unless-stopped
+    volumes:
+      - ./Center-Deep/instance:/app/instance:rw
+      - /var/run/docker.sock:/var/run/docker.sock
+    ports:
+      - "8888:8890"
+    networks:
+      unicorn-network:
+        aliases:
+          - searxng
+          - search
+          - center-deep
+    environment:
+      - FLASK_APP=app.py
+      - PYTHONUNBUFFERED=1
+      - ADMIN_USERNAME=${ADMIN_USERNAME:-ucadmin}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-MagicUnicorn!8-)}
+      - SECRET_KEY=${SEARXNG_SECRET}
+      - REDIS_URL=redis://unicorn-redis:6379/2
+      - SEARXNG_BACKEND_URL=http://unicorn-searxng-backend:8080
+      - LLM_ENDPOINT=${LLM_ENDPOINT:-http://unicorn-vllm:8000/v1}
+      - LLM_API_KEY=${VLLM_API_KEY:-dummy-key}
+      - LLM_MODEL=${DEFAULT_LLM_MODEL:-Qwen/Qwen2.5-32B-Instruct-AWQ}
+    depends_on:
+      redis:
+        condition: service_healthy
+      vllm:
+        condition: service_healthy
+      unicorn-searxng-backend:
+        condition: service_started
+    profiles:
+      - local
+
+  # Option 2: Build from GitHub repository (production - always latest)
+  # Use this for production deployments that should always use the latest version
+  unicorn-searxng-repo:
+    build:
+      context: .
+      dockerfile: Center-Deep.Dockerfile
+    container_name: unicorn-searxng
+    restart: unless-stopped
+    volumes:
+      - center-deep-data:/app/instance:rw
+      - /var/run/docker.sock:/var/run/docker.sock
+    ports:
+      - "8888:8890"
+    networks:
+      unicorn-network:
+        aliases:
+          - searxng
+          - search
+          - center-deep
+    environment:
+      - FLASK_APP=app.py
+      - PYTHONUNBUFFERED=1
+      - ADMIN_USERNAME=${ADMIN_USERNAME:-ucadmin}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-MagicUnicorn!8-)}
+      - SECRET_KEY=${SEARXNG_SECRET}
+      - REDIS_URL=redis://unicorn-redis:6379/2
+      - SEARXNG_BACKEND_URL=http://unicorn-searxng-backend:8080
+      - LLM_ENDPOINT=${LLM_ENDPOINT:-http://unicorn-vllm:8000/v1}
+      - LLM_API_KEY=${VLLM_API_KEY:-dummy-key}
+      - LLM_MODEL=${DEFAULT_LLM_MODEL:-Qwen/Qwen2.5-32B-Instruct-AWQ}
+    depends_on:
+      redis:
+        condition: service_healthy
+      vllm:
+        condition: service_healthy
+      unicorn-searxng-backend:
+        condition: service_started
+    profiles:
+      - production
+
+  # Option 3: Use pre-built image (fastest - when available)
+  # Use this when Unicorn-Commander publishes official Docker images
+  unicorn-searxng-image:
+    image: unicorncommander/center-deep:latest
+    container_name: unicorn-searxng
+    restart: unless-stopped
+    volumes:
+      - center-deep-data:/app/instance:rw
+      - /var/run/docker.sock:/var/run/docker.sock
+    ports:
+      - "8888:8890"
+    networks:
+      unicorn-network:
+        aliases:
+          - searxng
+          - search
+          - center-deep
+    environment:
+      - FLASK_APP=app.py
+      - PYTHONUNBUFFERED=1
+      - ADMIN_USERNAME=${ADMIN_USERNAME:-ucadmin}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-MagicUnicorn!8-)}
+      - SECRET_KEY=${SEARXNG_SECRET}
+      - REDIS_URL=redis://unicorn-redis:6379/2
+      - SEARXNG_BACKEND_URL=http://unicorn-searxng-backend:8080
+      - LLM_ENDPOINT=${LLM_ENDPOINT:-http://unicorn-vllm:8000/v1}
+      - LLM_API_KEY=${VLLM_API_KEY:-dummy-key}
+      - LLM_MODEL=${DEFAULT_LLM_MODEL:-Qwen/Qwen2.5-32B-Instruct-AWQ}
+    depends_on:
+      redis:
+        condition: service_healthy
+      vllm:
+        condition: service_healthy
+      unicorn-searxng-backend:
+        condition: service_started
+    profiles:
+      - image
+
+volumes:
+  center-deep-data:
+
+networks:
+  unicorn-network:
+    external: true

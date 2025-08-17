@@ -168,6 +168,19 @@ info:
 	@echo "Portainer started at http://localhost:9000"
 	@echo "Username: admin"
 	@echo "Password: $$(cat extensions/portainer/portainer_password.txt)"
+# Center-Deep Update Commands
+.PHONY: center-deep-update center-deep-rebuild
+
+center-deep-update:
+	@echo "🔄 Updating Center-Deep from Unicorn-Commander repository..."
+	@./scripts/update-center-deep.sh
+
+center-deep-rebuild:
+	@echo "🔨 Rebuilding Center-Deep container..."
+	@docker-compose build unicorn-searxng
+	@docker-compose up -d unicorn-searxng
+	@echo "✅ Center-Deep rebuilt and restarted"
+
 # Authentik SSO Commands
 .PHONY: auth-start auth-stop auth-restart auth-logs auth-status auth-test auth-setup-m365
 
