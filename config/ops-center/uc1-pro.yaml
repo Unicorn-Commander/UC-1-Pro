@@ -1,0 +1,103 @@
+# UC-1 Pro specific configuration for standalone Ops Center
+branding:
+  name: "UC-1 Pro Operations Center"
+  theme: "magic-unicorn"
+  logo: "/config/unicorn-logo.png"
+  favicon: "/config/favicon.ico"
+
+services:
+  # Define UC-1 Pro services for monitoring
+  - name: "vLLM Engine"
+    container: "unicorn-vllm"
+    type: "llm"
+    icon: "🤖"
+    healthcheck: "http://unicorn-vllm:8000/health"
+    
+  - name: "Open WebUI"
+    container: "unicorn-open-webui"
+    type: "frontend"
+    icon: "💬"
+    url: "http://localhost:8080"
+    
+  - name: "Center-Deep Search"
+    container: "unicorn-searxng"
+    type: "search"
+    icon: "🔍"
+    url: "http://localhost:8888"
+    
+  - name: "WhisperX STT"
+    container: "unicorn-whisperx"
+    type: "ai-service"
+    icon: "🎤"
+    
+  - name: "Kokoro TTS"
+    container: "unicorn-kokoro"
+    type: "ai-service"
+    icon: "🔊"
+
+backends:
+  llm:
+    type: "vllm"
+    endpoint: "http://unicorn-vllm:8000"
+    api_key: "${VLLM_API_KEY}"
+    models_path: "/volumes/vllm_models"
+    
+  embeddings:
+    endpoint: "http://unicorn-embeddings:8082"
+    
+  reranker:
+    endpoint: "http://unicorn-reranker:8080"
+
+features:
+  # Enable/disable features for UC-1 Pro
+  model_management: true
+  gpu_monitoring: true
+  network_management: true
+  storage_management: true
+  extension_system: true
+  authentication: true
+  backup_system: true
+  
+  # UC-1 Pro specific features
+  quick_actions:
+    - name: "Switch LLM Model"
+      action: "script"
+      script: "/scripts/switch-model.sh"
+    
+    - name: "GPU Memory Manager"
+      action: "script"
+      script: "/scripts/gpu-memory-manager.sh"
+    
+    - name: "Health Check"
+      action: "script"
+      script: "/scripts/health-check-detailed.sh"
+
+integrations:
+  huggingface:
+    token: "${HF_TOKEN}"
+    cache_dir: "/volumes/models"
+    
+  docker:
+    socket: "/var/run/docker.sock"
+    network: "unicorn-network"
+    
+monitoring:
+  prometheus:
+    endpoint: "http://unicorn-prometheus:9090"
+    
+  gpu_exporter:
+    endpoint: "http://unicorn-gpu-exporter:9835"
+
+# UC-1 Pro specific model presets
+model_presets:
+  recommended:
+    - "Qwen/Qwen2.5-32B-Instruct-AWQ"
+    - "meta-llama/Llama-3.1-8B-Instruct"
+    
+  embeddings:
+    - "BAAI/bge-base-en-v1.5"
+    - "nomic-ai/nomic-embed-text-v1.5"
+    
+  rerankers:
+    - "BAAI/bge-reranker-v2-m3"
+    - "mixedbread-ai/mxbai-rerank-large-v1"

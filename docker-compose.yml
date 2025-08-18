@@ -350,7 +350,9 @@ services:
 
   # --- Self-hosted Search: Center-Deep (Frontend) ---
   unicorn-searxng:
-    build: ./Center-Deep
+    build: 
+      context: ./Center-Deep
+      dockerfile: ../Center-Deep-Local.Dockerfile
     container_name: unicorn-searxng
     restart: unless-stopped
     volumes:

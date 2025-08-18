@@ -1,0 +1,39 @@
+# Example of how UC-1 Pro would consume standalone Ops Center
+version: '3.8'
+
+services:
+  # Option 1: Build from repository (like Center-Deep)
+  ops-center:
+    build:
+      context: https://github.com/MagicUnicornInc/AI-Ops-Center.git
+      dockerfile: Dockerfile
+    container_name: unicorn-ops-center
+    restart: unless-stopped
+    ports:
+      - "8084:8084"
+    environment:
+      # UC-1 Pro specific configuration
+      - CONFIG_FILE=/config/uc1-pro.yaml
+      - BRANDING_NAME=UC-1 Pro Operations Center
+      - BRANDING_LOGO=/config/unicorn-logo.png
+      - VLLM_ENDPOINT=http://unicorn-vllm:8000
+      - REDIS_URL=redis://unicorn-redis:6379
+      - POSTGRES_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@unicorn-postgresql:5432/${POSTGRES_DB}
+      - ENABLE_GPU_MONITORING=true
+      - ENABLE_MODEL_MANAGEMENT=true
+      - MODEL_BACKEND=vllm
+      - DOCKER_SOCKET=/var/run/docker.sock
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./config/ops-center:/config:ro  # UC-1 specific configs
+      - ops_center_data:/data
+    networks:
+      - unicorn-network
+
+  # Option 2: Use pre-built image
+  ops-center-image:
+    image: magicunicorn/ai-ops-center:latest
+    container_name: unicorn-ops-center
+    # Same configuration as above...
+    profiles:
+      - production

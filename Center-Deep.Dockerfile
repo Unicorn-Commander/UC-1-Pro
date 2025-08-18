@@ -14,7 +14,13 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # Clone Center-Deep from the official repository
-RUN git clone https://github.com/Unicorn-Commander/Center-Deep.git /tmp/center-deep && \
+# Note: If the repository is private, you'll need to pass a GitHub token
+ARG GITHUB_TOKEN=""
+RUN if [ -n "$GITHUB_TOKEN" ]; then \
+        git clone https://${GITHUB_TOKEN}@github.com/Unicorn-Commander/Center-Deep.git /tmp/center-deep; \
+    else \
+        git clone https://github.com/Unicorn-Commander/Center-Deep.git /tmp/center-deep; \
+    fi && \
     cp -r /tmp/center-deep/* /app/ && \
     rm -rf /tmp/center-deep
 

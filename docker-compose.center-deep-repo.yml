@@ -1,0 +1,53 @@
+# Center-Deep deployment using GitHub repository
+# This builds Center-Deep directly from the Unicorn-Commander repository
+# Requires GITHUB_TOKEN in .env if repository is private
+
+version: '3.8'
+
+services:
+  # Replace the default unicorn-searxng service with repository version
+  unicorn-searxng:
+    build:
+      context: .
+      dockerfile: Center-Deep.Dockerfile
+      args:
+        - GITHUB_TOKEN=${GITHUB_TOKEN}
+    container_name: unicorn-searxng
+    restart: unless-stopped
+    volumes:
+      - center-deep-instance:/app/instance:rw
+      - /var/run/docker.sock:/var/run/docker.sock
+    ports:
+      - "8888:8890"
+    networks:
+      unicorn-network:
+        aliases:
+          - searxng
+          - search
+          - center-deep
+    environment:
+      - FLASK_APP=app.py
+      - PYTHONUNBUFFERED=1
+      - ADMIN_USERNAME=${ADMIN_USERNAME:-ucadmin}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-MagicUnicorn!8-)}
+      - SECRET_KEY=${SEARXNG_SECRET}
+      - REDIS_URL=redis://unicorn-redis:6379/2
+      - SEARXNG_BACKEND_URL=http://unicorn-searxng-backend:8080
+      - LLM_ENDPOINT=${LLM_ENDPOINT:-http://unicorn-vllm:8000/v1}
+      - LLM_API_KEY=${VLLM_API_KEY:-dummy-key}
+      - LLM_MODEL=${DEFAULT_LLM_MODEL:-Qwen/Qwen2.5-32B-Instruct-AWQ}
+    depends_on:
+      redis:
+        condition: service_healthy
+      vllm:
+        condition: service_healthy
+      unicorn-searxng-backend:
+        condition: service_started
+
+volumes:
+  center-deep-instance:
+    driver: local
+
+networks:
+  unicorn-network:
+    external: true

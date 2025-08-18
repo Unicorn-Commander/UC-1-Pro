@@ -181,6 +181,15 @@ center-deep-rebuild:
 	@docker-compose up -d unicorn-searxng
 	@echo "✅ Center-Deep rebuilt and restarted"
 
+center-deep-repo:
+	@echo "🔄 Building Center-Deep from GitHub repository..."
+	@if [ -z "${GITHUB_TOKEN}" ]; then \
+		echo "⚠️  Warning: GITHUB_TOKEN not set in .env - this will fail if repo is private"; \
+	fi
+	@docker-compose -f docker-compose.yml -f docker-compose.center-deep-repo.yml build unicorn-searxng
+	@docker-compose -f docker-compose.yml -f docker-compose.center-deep-repo.yml up -d unicorn-searxng
+	@echo "✅ Center-Deep deployed from repository"
+
 # Authentik SSO Commands
 .PHONY: auth-start auth-stop auth-restart auth-logs auth-status auth-test auth-setup-m365
 
