@@ -27,8 +27,8 @@ import {
 } from '@heroicons/react/24/outline';
 import { CpuChipIcon as CpuChipSolid } from '@heroicons/react/24/solid';
 
-// Service URLs for "Open UI" buttons
-const serviceUrls = {
+// Service URLs will be fetched dynamically from the backend
+const defaultServiceUrls = {
   'vllm': 'http://localhost:8000/docs',
   'open-webui': 'http://localhost:8080',
   'searxng': 'http://localhost:8888',
@@ -120,6 +120,25 @@ export default function Services() {
   const [viewMode, setViewMode] = useState('cards'); // cards, table
   const [filterStatus, setFilterStatus] = useState('all'); // all, running, stopped
   const [sortBy, setSortBy] = useState('name'); // name, status, cpu, memory
+  const [serviceUrls, setServiceUrls] = useState(defaultServiceUrls);
+
+  // Fetch service URLs on component mount
+  useEffect(() => {
+    const fetchServiceUrls = async () => {
+      try {
+        const response = await fetch('/api/v1/service-urls');
+        if (response.ok) {
+          const data = await response.json();
+          setServiceUrls(data.service_urls);
+        }
+      } catch (error) {
+        console.error('Failed to fetch service URLs:', error);
+        // Keep using default URLs if fetch fails
+      }
+    };
+    
+    fetchServiceUrls();
+  }, []);
 
   const handleServiceAction = async (containerName, action) => {
     setLoading(prev => ({ ...prev, [`${containerName}-${action}`]: true }));
@@ -632,7 +651,7 @@ function ServiceCard({ service, index, loading, onAction, onViewLogs, onViewDeta
 
         {serviceUrl && isServiceRunning && (
           <a
-            href={serviceUrl.replace('localhost', window.location.hostname)}
+            href={serviceUrl}
             target="_blank"
             rel="noopener noreferrer"
             className="flex items-center justify-center gap-1 px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium"
@@ -811,7 +830,7 @@ function ServiceTable({ services, loading, onAction, onViewLogs, onViewDetails, 
                       
                       {serviceUrl && isServiceRunning && (
                         <a
-                          href={serviceUrl.replace('localhost', window.location.hostname)}
+                          href={serviceUrl}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="inline-flex items-center gap-1 px-3 py-1 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors text-xs"

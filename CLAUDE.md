@@ -160,6 +160,10 @@ make portainer
 Key configuration in `.env`:
 
 ```env
+# Network Configuration
+EXTERNAL_HOST=yoda.magicunicorn.tech  # Your domain or IP address
+EXTERNAL_PROTOCOL=https                # http or https
+
 # Model Configuration
 DEFAULT_LLM_MODEL=Qwen/Qwen2.5-32B-Instruct-AWQ
 GPU_MEMORY_UTIL=0.95
@@ -190,6 +194,38 @@ BACKUP_RETENTION_DAYS=7
 ADMIN_USERNAME=ucadmin
 ADMIN_PASSWORD=MagicUnicorn!8-)
 ```
+
+## Remote Access Configuration
+
+### Setting Up Domain Access
+
+1. **Configure External Host**: Set `EXTERNAL_HOST` in `.env` to your domain or IP address
+2. **Set Protocol**: Use `EXTERNAL_PROTOCOL=https` if SSL is configured, otherwise `http`
+3. **Subdomain Support**: Services automatically use subdomains when configured:
+   - Open-WebUI: `chat.yourdomain.com`
+   - Center-Deep: `search.yourdomain.com`
+   - Ops Center: `yourdomain.com:8084`
+
+### DNS Configuration for Subdomains
+
+If using subdomains, configure DNS records:
+```
+A    @        YOUR_SERVER_IP
+A    chat     YOUR_SERVER_IP
+A    search   YOUR_SERVER_IP
+```
+
+Or use wildcard:
+```
+A    *.       YOUR_SERVER_IP
+```
+
+### Service URLs
+
+Service URLs are dynamically generated based on your configuration:
+- When `EXTERNAL_HOST=localhost`: Uses standard localhost URLs
+- When domain configured: Automatically uses domain with appropriate ports/subdomains
+- Access Ops Center to view all configured service URLs
 
 ## Center-Deep Integration
 
@@ -399,8 +435,16 @@ When testing changes:
 - **Theme System**: Magic Unicorn, Dark, Light themes with dynamic branding
 - **UI Improvements**: Fixed /admin routing, enhanced service status cards
 - **Deployment Context**: Frontend adapts based on enterprise vs appliance mode
+- **The Colonel Logo**: UC-1 Pro mascot prominently displayed in admin header
 
-### Ops Center Landing Page (Current Development)
+### Remote Access & Domain Configuration
+- **Dynamic Service URLs**: Service links automatically use configured domain/subdomain
+- **Subdomain Support**: Services accessible via subdomains (chat.domain, search.domain)
+- **Environment-Based Configuration**: EXTERNAL_HOST and EXTERNAL_PROTOCOL settings
+- **API Endpoint**: `/api/v1/service-urls` provides dynamic service URLs
+- **No Hardcoded URLs**: All service links adapt to deployment configuration
+
+### Ops Center Landing Page
 - **Modern UI Design**: Custom landing page with gradient backgrounds and service cards
 - **Service Quick Access**: Direct links to Open-WebUI, Center-Deep, Unicorn Orator, Bolt.DIY
 - **Center-Deep Search Integration**: Integrated search bar that redirects to Center-Deep
@@ -413,6 +457,7 @@ When testing changes:
 - `/api/v1/deployment/config`: Get deployment configuration and feature flags
 - `/api/v1/system/status`: Enhanced system metrics with GPU monitoring
 - `/api/v1/landing/config`: Landing page configuration endpoint
+- `/api/v1/service-urls`: Dynamic service URLs based on domain configuration
 - Enhanced monitoring capabilities with graceful fallbacks
 
 ### GPU Configuration

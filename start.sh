@@ -51,12 +51,23 @@ docker-compose up -d
 echo -e "\n${GREEN}UC-1 Pro stack is starting!${NC}"
 echo ""
 echo "Services will be available at:"
-echo "  - Open-WebUI: http://localhost:8080"
-echo "  - vLLM API: http://localhost:8000/docs"
-echo "  - Model Manager: http://localhost:8084"
-echo "  - SearXNG: http://localhost:8888"
-echo "  - GPU Metrics: http://localhost:9835/metrics"
-echo "  - Prometheus: http://localhost:9090"
+if [ -n "$EXTERNAL_HOST" ] && [ "$EXTERNAL_HOST" != "localhost" ]; then
+    # Remote access URLs
+    echo "  - Open-WebUI: ${EXTERNAL_PROTOCOL:-http}://chat.${EXTERNAL_HOST}"
+    echo "  - Center-Deep Search: ${EXTERNAL_PROTOCOL:-http}://search.${EXTERNAL_HOST}"
+    echo "  - Admin Dashboard: ${EXTERNAL_PROTOCOL:-http}://${EXTERNAL_HOST}:8084"
+    echo "  - vLLM API: ${EXTERNAL_PROTOCOL:-http}://${EXTERNAL_HOST}:8000/docs"
+    echo "  - GPU Metrics: ${EXTERNAL_PROTOCOL:-http}://${EXTERNAL_HOST}:9835/metrics"
+    echo "  - Prometheus: ${EXTERNAL_PROTOCOL:-http}://${EXTERNAL_HOST}:9090"
+else
+    # Local access URLs
+    echo "  - Open-WebUI: http://localhost:8080"
+    echo "  - Center-Deep Search: http://localhost:8888"
+    echo "  - Admin Dashboard: http://localhost:8084"
+    echo "  - vLLM API: http://localhost:8000/docs"
+    echo "  - GPU Metrics: http://localhost:9835/metrics"
+    echo "  - Prometheus: http://localhost:9090"
+fi
 echo ""
 echo "First-time model download may take 10-30 minutes."
 echo "Check logs with: docker-compose logs -f vllm"

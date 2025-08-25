@@ -53,7 +53,8 @@ const statusConfig = {
   }
 };
 
-const serviceUrls = {
+// Service URLs will be passed as props or fetched dynamically
+const defaultServiceUrls = {
   'vllm': { url: 'http://localhost:8000/docs', label: 'API Documentation' },
   'open-webui': { url: 'http://localhost:8080', label: 'Chat Interface' },
   'searxng': { url: 'http://localhost:8888', label: 'Search Interface' },
@@ -67,7 +68,8 @@ export default function ServiceControlCard({
   onAction, 
   onViewLogs, 
   onConfigure, 
-  systemStatus 
+  systemStatus,
+  serviceUrls = defaultServiceUrls
 }) {
   const [expanded, setExpanded] = useState(false);
   
@@ -275,7 +277,7 @@ export default function ServiceControlCard({
             {/* Open UI Button */}
             {serviceUrl && service.status === 'healthy' && (
               <a
-                href={serviceUrl.url.replace('localhost', window.location.hostname)}
+                href={serviceUrl.url || serviceUrl}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="flex items-center gap-1 px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-center"

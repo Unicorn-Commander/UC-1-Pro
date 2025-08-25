@@ -3,7 +3,7 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse, StreamingResponse
+from fastapi.responses import FileResponse, StreamingResponse, JSONResponse
 import psutil
 import docker
 import asyncio
@@ -34,6 +34,53 @@ from log_manager import log_manager, LogFilter, LogExportRequest
 from auth_manager import auth_manager, UserCreate, UserUpdate, PasswordChange, LoginCredentials, APIKeyCreate
 from hardware_info import hardware_detector
 from update_manager import github_update_manager
+from fastapi.responses import RedirectResponse
+import secrets
+import base64
+from landing_config import landing_config
+
+# Authentik SSO integration
+try:
+    from authentik_integration import (
+        authentik_integration, 
+        AuthentikUser, 
+        AuthentikUserCreate, 
+        AuthentikUserUpdate,
+        AuthentikPasswordReset,
+        AuthentikGroup
+    )
+    AUTHENTIK_ENABLED = True
+except ImportError:
+    print("Authentik integration not available")
+    AUTHENTIK_ENABLED = False
+
+# OAuth settings from environment
+AUTHENTIK_URL = os.environ.get("AUTHENTIK_URL", "http://authentik-server:9000")
+EXTERNAL_HOST = os.environ.get("EXTERNAL_HOST", "192.168.1.135")
+EXTERNAL_PROTOCOL = os.environ.get("EXTERNAL_PROTOCOL", "http")
+OAUTH_CLIENT_ID = "ops-center"
+OAUTH_CLIENT_SECRET = os.environ.get("OPS_CENTER_OAUTH_CLIENT_SECRET", "a1b2c3d4e5f6789012345678901234567890abcd")
+OAUTH_REDIRECT_URI = f"{EXTERNAL_PROTOCOL}://{EXTERNAL_HOST}:8084/auth/callback"
+
+# Session storage (in production, use Redis or database)
+sessions = {}
+
+# Enhanced monitoring imports
+try:
+    from resource_monitor import ResourceMonitor
+    resource_monitor = ResourceMonitor()
+    ENHANCED_MONITORING = True
+except ImportError:
+    print("Enhanced monitoring not available, using basic monitoring")
+    ENHANCED_MONITORING = False
+
+try:
+    from deployment_config import DeploymentService
+    deployment_service = DeploymentService()
+    DEPLOYMENT_CONFIG = True
+except ImportError:
+    print("Deployment config not available, using defaults")
+    DEPLOYMENT_CONFIG = False
 
 app = FastAPI(title="UC-1 Pro Admin Dashboard API")
 
@@ -51,6 +98,48 @@ app.add_middleware(
 
 # Enable GZip compression for faster response times
 app.add_middleware(GZipMiddleware, minimum_size=1000)
+
+# Root redirect must be defined early to take precedence
+@app.get("/", include_in_schema=False)
+async def root_redirect(request: Request):
+    """Serve public ops center page or redirect to Authentik for login"""
+    print("Root redirect handler called!")
+    session_token = request.cookies.get("session_token")
+    if session_token and session_token in sessions:
+        print("User authenticated, serving public ops center page")
+        # Serve the original landing page for authenticated users
+        static_path = "public/index.html"
+        unicorn_path = "public/landing-unicorn.html"
+        modern_path = "public/landing-modern.html"
+        dynamic_path = "public/landing-dynamic.html"
+        
+        # Try original index.html first (matches GitHub screenshot)
+        if os.path.exists(static_path):
+            return FileResponse(static_path)
+        elif os.path.exists("../public/index.html"):
+            return FileResponse("../public/index.html")
+        # Fallback to Unicorn Commander PRO page
+        elif os.path.exists(unicorn_path):
+            return FileResponse(unicorn_path)
+        elif os.path.exists("../public/landing-unicorn.html"):
+            return FileResponse("../public/landing-unicorn.html")
+        # Fallback to modern page
+        elif os.path.exists(modern_path):
+            return FileResponse(modern_path)
+        elif os.path.exists("../public/landing-modern.html"):
+            return FileResponse("../public/landing-modern.html")
+        # Fallback to dynamic page
+        elif os.path.exists(dynamic_path):
+            return FileResponse(dynamic_path)
+        elif os.path.exists("../public/landing-dynamic.html"):
+            return FileResponse("../public/landing-dynamic.html")
+        else:
+            # Fallback to admin if public page not found
+            return RedirectResponse(url="/admin", status_code=302)
+    else:
+        print("User not authenticated, redirecting to Authentik")
+        # Redirect directly to OAuth login
+        return RedirectResponse(url="/auth/login", status_code=302)
 
 # Initialize Docker client
 try:
@@ -733,8 +822,62 @@ async def download_model_with_progress(model_id: str, quantization: Optional[str
 
 @app.get("/api/v1/system/status")
 async def get_system_status():
-    """Get current system resource usage"""
+    """Get current system resource usage with enhanced monitoring"""
     try:
+        # Try enhanced monitoring first
+        if ENHANCED_MONITORING:
+            try:
+                metrics = {
+                    "cpu": resource_monitor.get_cpu_metrics(),
+                    "memory": resource_monitor.get_memory_metrics(),
+                    "gpu": resource_monitor.get_gpu_metrics(),
+                    "disk": resource_monitor.get_disk_metrics(),
+                    "network": resource_monitor.get_network_metrics(),
+                    "processes": resource_monitor.get_top_processes()
+                }
+                
+                # Format for API compatibility
+                gpu_info = []
+                if metrics["gpu"].get("nvidia_gpus"):
+                    for gpu in metrics["gpu"]["nvidia_gpus"]:
+                        gpu_info.append({
+                            "name": gpu.get("name", "Unknown GPU"),
+                            "utilization": gpu.get("utilization_percent", 0),
+                            "memory_used": gpu.get("memory_used_mb", 0) * 1024 * 1024,
+                            "memory_total": gpu.get("memory_total_mb", 0) * 1024 * 1024,
+                            "temperature": gpu.get("temperature", 0),
+                            "power_draw": gpu.get("power_w", 0),
+                            "power_limit": gpu.get("power_limit_w", 0)
+                        })
+                
+                return {
+                    "cpu": {
+                        "percent": metrics["cpu"].get("usage_percent", 0),
+                        "per_cpu": metrics["cpu"].get("per_core_usage", []),
+                        "cores": metrics["cpu"].get("cores", 0),
+                        "freq_current": metrics["cpu"].get("frequency", {}).get("current", 0)
+                    },
+                    "memory": {
+                        "used": int(metrics["memory"].get("ram", {}).get("used_gb", 0) * 1024 * 1024 * 1024),
+                        "total": int(metrics["memory"].get("ram", {}).get("total_gb", 0) * 1024 * 1024 * 1024),
+                        "available": int(metrics["memory"].get("ram", {}).get("available_gb", 0) * 1024 * 1024 * 1024),
+                        "percent": metrics["memory"].get("ram", {}).get("percent", 0)
+                    },
+                    "disk": {
+                        "used": int(metrics["disk"].get("partitions", [{}])[0].get("used_gb", 0) * 1024 * 1024 * 1024),
+                        "total": int(metrics["disk"].get("partitions", [{}])[0].get("total_gb", 0) * 1024 * 1024 * 1024),
+                        "percent": metrics["disk"].get("partitions", [{}])[0].get("percent", 0)
+                    },
+                    "gpu": gpu_info,
+                    "uptime": int(time.time() - psutil.boot_time()),
+                    "load_average": metrics["cpu"].get("load_average", [0, 0, 0]),
+                    "processes": metrics.get("processes", []),
+                    "enhanced_monitoring": True
+                }
+            except Exception as e:
+                print(f"Enhanced monitoring failed, falling back to basic: {e}")
+        
+        # Fallback to basic monitoring
         # CPU info - use non-blocking calls
         cpu_percent = psutil.cpu_percent(interval=0)  # Non-blocking
         cpu_percent_per_core = psutil.cpu_percent(interval=0, percpu=True)  # Non-blocking
@@ -840,7 +983,8 @@ async def get_system_status():
             "gpu": gpu_info,
             "uptime": uptime,
             "load_average": list(load_avg),
-            "processes": processes
+            "processes": processes,
+            "enhanced_monitoring": False
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -886,6 +1030,205 @@ async def get_disk_io_stats():
     except Exception as e:
         logger.error(f"Disk I/O stats error: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to get disk I/O stats: {str(e)}")
+
+@app.get("/api/v1/deployment/config")
+async def get_deployment_config():
+    """Get deployment configuration"""
+    try:
+        if DEPLOYMENT_CONFIG:
+            # Use the enhanced deployment service
+            config = {
+                "deployment_type": deployment_service.detect_deployment_type(),
+                "primary_app_url": deployment_service.get_primary_app_url(),
+                "admin_only_mode": deployment_service.is_admin_only_mode(),
+                "registered_applications": deployment_service.get_registered_applications(),
+                "enabled_features": deployment_service.get_enabled_features(),
+                "branding": deployment_service.get_branding_config()
+            }
+        else:
+            # Fallback configuration for UC-1 Pro
+            config = {
+                "deployment_type": "enterprise",
+                "primary_app_url": "http://localhost:8080",
+                "admin_only_mode": False,
+                "registered_applications": ["open-webui", "center-deep", "vllm"],
+                "enabled_features": ["vllm", "gpu_monitoring", "enterprise_auth", "model_management"],
+                "branding": {
+                    "name": "UC-1 Pro Operations Center",
+                    "theme": "unicorn"
+                }
+            }
+        return config
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+# ===========================
+# Landing Page Customization
+# ===========================
+
+@app.get("/api/v1/landing/config")
+async def get_landing_config():
+    """Get landing page configuration"""
+    try:
+        return landing_config.get_config()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/v1/landing/config")
+async def update_landing_config(updates: dict):
+    """Update landing page configuration"""
+    try:
+        success = landing_config.update_config(updates)
+        if success:
+            return {"status": "success", "config": landing_config.get_config()}
+        else:
+            raise HTTPException(status_code=500, detail="Failed to update configuration")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/v1/landing/theme/{preset}")
+async def apply_theme_preset(preset: str):
+    """Apply a theme preset"""
+    try:
+        if preset not in landing_config.THEME_PRESETS:
+            raise HTTPException(status_code=400, detail=f"Invalid preset: {preset}")
+        
+        success = landing_config.apply_theme_preset(preset)
+        if success:
+            return {"status": "success", "config": landing_config.get_config()}
+        else:
+            raise HTTPException(status_code=500, detail="Failed to apply theme")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/v1/landing/themes")
+async def get_available_themes():
+    """Get available theme presets"""
+    return landing_config.THEME_PRESETS
+
+@app.get("/api/v1/service-urls")
+async def get_service_urls():
+    """Get service URLs with proper domain configuration"""
+    external_host = os.getenv("EXTERNAL_HOST", "localhost")
+    external_protocol = os.getenv("EXTERNAL_PROTOCOL", "http")
+    
+    # Build base URL
+    if external_host != "localhost":
+        base_url = f"{external_protocol}://{external_host}"
+    else:
+        base_url = ""  # Empty for relative URLs when using localhost
+    
+    # Define service URLs with subdomain support
+    service_urls = {
+        'vllm': f"{base_url}:8000/docs" if base_url else "http://localhost:8000/docs",
+        'open-webui': f"{external_protocol}://chat.{external_host}" if external_host != "localhost" else "http://localhost:8080",
+        'searxng': f"{external_protocol}://search.{external_host}" if external_host != "localhost" else "http://localhost:8888",
+        'prometheus': f"{base_url}:9090" if base_url else "http://localhost:9090",
+        'grafana': f"{base_url}:3000" if base_url else "http://localhost:3000",
+        'portainer': f"{base_url}:9443" if base_url else "http://localhost:9443",
+        'comfyui': f"{base_url}:8188" if base_url else "http://localhost:8188",
+        'n8n': f"{base_url}:5678" if base_url else "http://localhost:5678",
+        'qdrant': f"{base_url}:6333/dashboard" if base_url else "http://localhost:6333/dashboard",
+        'admin-dashboard': f"{base_url}:8084" if base_url else "http://localhost:8084",
+        'ollama': f"{base_url}:11434" if base_url else "http://localhost:11434",
+        'ollama-webui': f"{base_url}:11435" if base_url else "http://localhost:11435"
+    }
+    
+    return {
+        "base_url": base_url,
+        "external_host": external_host,
+        "external_protocol": external_protocol,
+        "service_urls": service_urls
+    }
+
+@app.post("/api/v1/landing/service/{service_id}")
+async def update_landing_service(service_id: str, updates: dict):
+    """Update a specific service configuration"""
+    try:
+        success = landing_config.update_service(service_id, updates)
+        if success:
+            return {"status": "success", "config": landing_config.get_config()}
+        else:
+            raise HTTPException(status_code=404, detail=f"Service {service_id} not found")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/v1/landing/custom-link")
+async def add_custom_link(link_data: dict):
+    """Add a custom service link"""
+    try:
+        success = landing_config.add_custom_link(link_data)
+        if success:
+            return {"status": "success", "config": landing_config.get_config()}
+        else:
+            raise HTTPException(status_code=500, detail="Failed to add custom link")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.delete("/api/v1/landing/custom-link/{link_id}")
+async def remove_custom_link(link_id: str):
+    """Remove a custom service link"""
+    try:
+        success = landing_config.remove_custom_link(link_id)
+        if success:
+            return {"status": "success", "config": landing_config.get_config()}
+        else:
+            raise HTTPException(status_code=404, detail=f"Link {link_id} not found")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/v1/landing/reorder")
+async def reorder_services(service_order: list):
+    """Reorder services on landing page"""
+    try:
+        success = landing_config.reorder_services(service_order)
+        if success:
+            return {"status": "success", "config": landing_config.get_config()}
+        else:
+            raise HTTPException(status_code=500, detail="Failed to reorder services")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/v1/landing/reset")
+async def reset_landing_config():
+    """Reset landing page to default configuration"""
+    try:
+        success = landing_config.reset_to_default()
+        if success:
+            return {"status": "success", "config": landing_config.get_config()}
+        else:
+            raise HTTPException(status_code=500, detail="Failed to reset configuration")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/v1/landing/export")
+async def export_landing_config():
+    """Export landing page configuration"""
+    try:
+        config_json = landing_config.export_config()
+        return JSONResponse(
+            content={"config": config_json},
+            headers={"Content-Disposition": "attachment; filename=landing_config.json"}
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/v1/landing/import")
+async def import_landing_config(config_data: dict):
+    """Import landing page configuration"""
+    try:
+        config_json = json.dumps(config_data)
+        success = landing_config.import_config(config_json)
+        if success:
+            return {"status": "success", "config": landing_config.get_config()}
+        else:
+            raise HTTPException(status_code=400, detail="Invalid configuration format")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+# ===========================
+# Service Management
+# ===========================
 
 @app.get("/api/v1/services")
 async def list_services():
@@ -2065,6 +2408,74 @@ async def delete_api_key(key_id: str, current_user: dict = Depends(get_current_u
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+# Authentik SSO User Management
+if AUTHENTIK_ENABLED:
+    @app.get("/api/v1/sso/users")
+    async def get_sso_users(current_user: dict = Depends(require_admin)):
+        """Get all users from Authentik (admin only)"""
+        users = await authentik_integration.get_users()
+        return {"users": users}
+    
+    @app.post("/api/v1/sso/users")
+    async def create_sso_user(user: AuthentikUserCreate, current_user: dict = Depends(require_admin)):
+        """Create a new user in Authentik (admin only)"""
+        created_user = await authentik_integration.create_user(user)
+        if not created_user:
+            raise HTTPException(status_code=400, detail="Failed to create user")
+        return created_user
+    
+    @app.put("/api/v1/sso/users/{user_id}")
+    async def update_sso_user(user_id: str, update: AuthentikUserUpdate, current_user: dict = Depends(require_admin)):
+        """Update a user in Authentik (admin only)"""
+        updated_user = await authentik_integration.update_user(user_id, update)
+        if not updated_user:
+            raise HTTPException(status_code=404, detail="User not found")
+        return updated_user
+    
+    @app.delete("/api/v1/sso/users/{user_id}")
+    async def delete_sso_user(user_id: str, current_user: dict = Depends(require_admin)):
+        """Delete a user from Authentik (admin only)"""
+        success = await authentik_integration.delete_user(user_id)
+        if not success:
+            raise HTTPException(status_code=404, detail="User not found")
+        return {"message": "User deleted successfully"}
+    
+    @app.post("/api/v1/sso/users/{user_id}/set-password")
+    async def set_sso_user_password(user_id: str, reset: AuthentikPasswordReset, current_user: dict = Depends(require_admin)):
+        """Set a user's password in Authentik (admin only)"""
+        success = await authentik_integration.set_user_password(user_id, reset.password)
+        if not success:
+            raise HTTPException(status_code=400, detail="Failed to set password")
+        return {"message": "Password set successfully"}
+    
+    @app.get("/api/v1/sso/groups")
+    async def get_sso_groups(current_user: dict = Depends(require_admin)):
+        """Get all groups from Authentik (admin only)"""
+        groups = await authentik_integration.get_groups()
+        return {"groups": groups}
+    
+    @app.post("/api/v1/sso/groups")
+    async def create_sso_group(name: str, is_superuser: bool = False, current_user: dict = Depends(require_admin)):
+        """Create a new group in Authentik (admin only)"""
+        group = await authentik_integration.create_group(name, is_superuser)
+        if not group:
+            raise HTTPException(status_code=400, detail="Failed to create group")
+        return group
+    
+    @app.post("/api/v1/sso/users/{user_id}/groups/{group_id}")
+    async def add_user_to_group(user_id: str, group_id: str, current_user: dict = Depends(require_admin)):
+        """Add a user to a group in Authentik (admin only)"""
+        success = await authentik_integration.add_user_to_group(user_id, group_id)
+        if not success:
+            raise HTTPException(status_code=400, detail="Failed to add user to group")
+        return {"message": "User added to group successfully"}
+    
+    @app.get("/api/v1/sso/stats")
+    async def get_sso_stats(current_user: dict = Depends(get_current_user)):
+        """Get SSO user statistics"""
+        stats = await authentik_integration.get_user_stats()
+        return stats
+
 # Session Management
 @app.get("/api/v1/sessions")
 async def get_sessions(current_user: dict = Depends(get_current_user)):
@@ -2122,22 +2533,334 @@ async def get_changelog(limit: int = 10):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+# Direct login endpoint
+@app.post("/auth/direct-login")
+async def direct_login(request: Request, credentials: dict):
+    """Direct authentication with Authentik"""
+    username = credentials.get("username")
+    password = credentials.get("password")
+    
+    if not username or not password:
+        raise HTTPException(status_code=400, detail="Username and password required")
+    
+    # Authenticate against Authentik
+    async with httpx.AsyncClient() as client:
+        # Try to authenticate using Authentik's password flow
+        auth_url = "https://auth.yoda.magicunicorn.tech" if "yoda.magicunicorn.tech" in str(request.url) else f"{AUTHENTIK_URL}"
+        
+        # Use OAuth password grant
+        token_url = f"{auth_url}/application/o/token/"
+        data = {
+            "grant_type": "password",
+            "username": username,
+            "password": password,
+            "client_id": OAUTH_CLIENT_ID,
+            "client_secret": OAUTH_CLIENT_SECRET,
+            "scope": "openid profile email"
+        }
+        
+        try:
+            response = await client.post(token_url, data=data)
+            
+            if response.status_code == 200:
+                tokens = response.json()
+                access_token = tokens.get("access_token")
+                
+                # Get user info
+                userinfo_url = f"{auth_url}/application/o/userinfo/"
+                headers = {"Authorization": f"Bearer {access_token}"}
+                user_response = await client.get(userinfo_url, headers=headers)
+                
+                if user_response.status_code == 200:
+                    user_info = user_response.json()
+                    
+                    # Create session
+                    session_token = base64.urlsafe_b64encode(secrets.token_bytes(32)).decode('utf-8')
+                    sessions[session_token] = {
+                        "user": user_info,
+                        "access_token": access_token,
+                        "created": time.time()
+                    }
+                    
+                    # Create response with session cookie
+                    response = JSONResponse({"success": True, "user": user_info})
+                    response.set_cookie(
+                        key="session_token",
+                        value=session_token,
+                        httponly=True,
+                        secure=("https" in str(request.url)),
+                        samesite="lax",
+                        max_age=86400  # 24 hours
+                    )
+                    return response
+            else:
+                # Authentication failed
+                return JSONResponse(
+                    {"success": False, "detail": "Invalid username or password"},
+                    status_code=401
+                )
+                
+        except Exception as e:
+            print(f"Direct login error: {e}")
+            return JSONResponse(
+                {"success": False, "detail": "Authentication service unavailable"},
+                status_code=503
+            )
+
+# OAuth endpoints
+@app.get("/auth/login")
+async def oauth_login(request: Request):
+    """Redirect to Authentik OAuth authorization"""
+    state = secrets.token_urlsafe(32)
+    sessions[state] = {"created": time.time()}
+    
+    # Build redirect URI based on the request host
+    if "yoda.magicunicorn.tech" in str(request.url):
+        redirect_uri = "https://yoda.magicunicorn.tech/auth/callback"
+        auth_base = "https://auth.yoda.magicunicorn.tech"
+    else:
+        # Use the external host from environment
+        redirect_uri = f"https://{EXTERNAL_HOST}/auth/callback"
+        auth_base = f"https://auth.{EXTERNAL_HOST}"
+    
+    auth_url = (
+        f"{auth_base}/application/o/authorize/"
+        f"?client_id={OAUTH_CLIENT_ID}"
+        f"&redirect_uri={redirect_uri}"
+        f"&response_type=code"
+        f"&scope=openid%20profile%20email"
+        f"&state={state}"
+    )
+    return RedirectResponse(url=auth_url)
+
+@app.get("/auth/callback")
+async def oauth_callback(request: Request, code: str, state: str = None):
+    """Handle OAuth callback from Authentik"""
+    # Log immediately to file to debug
+    with open("/tmp/oauth_debug.log", "a") as f:
+        f.write(f"=== OAuth callback at {datetime.now()} ===\n")
+        f.write(f"Code: {code[:10] if code else 'None'}...\n")
+        f.write(f"State: {state}\n")
+        f.write(f"URL: {request.url}\n")
+        f.write(f"Client ID: {OAUTH_CLIENT_ID}\n")
+        f.write(f"Client Secret exists: {bool(OAUTH_CLIENT_SECRET)}\n")
+    
+    # Build correct redirect URI based on the request
+    if "yoda.magicunicorn.tech" in str(request.url):
+        redirect_uri = "https://yoda.magicunicorn.tech/auth/callback"
+        token_url = "https://auth.yoda.magicunicorn.tech/application/o/token/"
+    else:
+        redirect_uri = f"https://{EXTERNAL_HOST}/auth/callback"
+        token_url = f"https://auth.{EXTERNAL_HOST}/application/o/token/"
+    
+    # Exchange code for token
+    async with httpx.AsyncClient() as client:
+        data = {
+            "grant_type": "authorization_code",
+            "code": code,
+            "redirect_uri": redirect_uri,
+            "client_id": OAUTH_CLIENT_ID,
+            "client_secret": OAUTH_CLIENT_SECRET
+        }
+        
+        try:
+            print(f"Starting token exchange to: {token_url}")
+            print(f"With data: client_id={OAUTH_CLIENT_ID}, code={code[:10]}...")
+            response = await client.post(token_url, data=data)
+            print(f"Token exchange response: {response.status_code}")
+            
+            if response.status_code == 200:
+                try:
+                    tokens = response.json()
+                    access_token = tokens.get("access_token")
+                    print(f"Got access token: {access_token[:20] if access_token else 'None'}...")
+                    
+                    if not access_token:
+                        print(f"No access token in response: {tokens}")
+                        return RedirectResponse(url="/?error=no_access_token")
+                except Exception as e:
+                    print(f"Failed to parse token response: {e}")
+                    print(f"Response text: {response.text}")
+                    return RedirectResponse(url="/?error=token_parse_error")
+                
+                # Get user info
+                if "yoda.magicunicorn.tech" in str(request.url):
+                    userinfo_url = "https://auth.yoda.magicunicorn.tech/application/o/userinfo/"
+                else:
+                    userinfo_url = f"{AUTHENTIK_URL}/application/o/userinfo/"
+                
+                print(f"Getting user info from: {userinfo_url}")
+                headers = {"Authorization": f"Bearer {access_token}"}
+                user_response = await client.get(userinfo_url, headers=headers)
+                print(f"User info response: {user_response.status_code}")
+                
+                if user_response.status_code == 200:
+                    user_info = user_response.json()
+                    print(f"User info retrieved: {user_info.get('username', 'unknown')}")
+                    
+                    # Create session
+                    session_token = secrets.token_urlsafe(32)
+                    sessions[session_token] = {
+                        "user": user_info,
+                        "access_token": access_token,
+                        "created": time.time()
+                    }
+                    print(f"Session created with token: {session_token[:10]}...")
+                    print(f"Total sessions: {len(sessions)}")
+                    
+                    # Redirect to root (public ops center) with session token
+                    response = RedirectResponse(url="/")
+                    
+                    # Set cookie with domain for subdomain access if using magicunicorn.tech
+                    cookie_kwargs = {
+                        "key": "session_token",
+                        "value": session_token,
+                        "path": "/",  # Ensure cookie is available for all paths
+                        "httponly": True,
+                        "secure": (EXTERNAL_PROTOCOL == "https"),
+                        "samesite": "lax",
+                        "max_age": 86400  # 24 hours
+                    }
+                    
+                    # If using subdomain, set domain to allow cookie sharing
+                    if "magicunicorn.tech" in EXTERNAL_HOST:
+                        # Set domain to parent domain for subdomain sharing
+                        cookie_kwargs["domain"] = ".yoda.magicunicorn.tech"
+                    
+                    response.set_cookie(**cookie_kwargs)
+                    print(f"Redirecting to / with session cookie")
+                    return response
+                else:
+                    print(f"Failed to get user info: {user_response.status_code}")
+                    print(f"User info error: {user_response.text}")
+            else:
+                print(f"Token exchange failed: {response.status_code}")
+                print(f"Token error: {response.text}")
+        except Exception as e:
+            print(f"OAuth error: {e}")
+            import traceback
+            traceback.print_exc()
+    
+    # On error, redirect back to root which will restart auth flow
+    return RedirectResponse(url="/?error=authentication_failed")
+
+@app.get("/auth/logout")
+async def logout(request: Request):
+    """Logout and clear session"""
+    session_token = request.cookies.get("session_token")
+    if session_token and session_token in sessions:
+        del sessions[session_token]
+    
+    # Redirect to root, which will trigger auth flow again
+    response = RedirectResponse(url="/")
+    response.delete_cookie("session_token")
+    return response
+
+@app.get("/auth/user")
+async def get_current_user(request: Request):
+    """Get current authenticated user info"""
+    session_token = request.cookies.get("session_token")
+    print(f"Auth check - Token from cookie: {session_token[:10] if session_token else 'None'}...")
+    print(f"Auth check - Sessions count: {len(sessions)}")
+    
+    if not session_token or session_token not in sessions:
+        print(f"Auth check - Token not found in sessions")
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    
+    session = sessions[session_token]
+    print(f"Auth check - User: {session['user'].get('username', 'unknown')}")
+    return {"user": session["user"]}
+
+@app.get("/auth/check")
+async def check_auth(request: Request):
+    """Check authentication for Traefik ForwardAuth"""
+    session_token = request.cookies.get("session_token")
+    if not session_token or session_token not in sessions:
+        # Return 401 to trigger redirect to login
+        raise HTTPException(status_code=401, detail="Authentication required")
+    
+    # Return 200 to allow access
+    return {"authenticated": True}
+
+@app.get("/api/v1/auth/session")
+async def get_session_info(request: Request):
+    """Bridge OAuth session to React app"""
+    print(f"Session endpoint called. Cookies: {request.cookies}")
+    session_token = request.cookies.get("session_token")
+    print(f"Session token from cookie: {session_token[:10] if session_token else 'None'}...")
+    print(f"Available sessions: {len(sessions)}")
+    
+    if session_token and session_token in sessions:
+        session = sessions[session_token]
+        user_info = session.get("user", {})
+        
+        # Generate a token for the React app to use
+        import json
+        import base64
+        token_data = {
+            "username": user_info.get("username", user_info.get("preferred_username", "user")),
+            "role": "admin",
+            "auth_method": "oauth"
+        }
+        # Simple token for React app (not secure, just for session bridging)
+        token = base64.b64encode(json.dumps(token_data).encode()).decode()
+        
+        return {
+            "authenticated": True,
+            "token": token,
+            "user": {
+                "username": user_info.get("username", user_info.get("preferred_username", "user")),
+                "email": user_info.get("email", ""),
+                "name": user_info.get("name", ""),
+                "role": "admin"
+            }
+        }
+    
+    # No valid session found
+    print(f"No valid session found. Token exists: {bool(session_token)}, In sessions: {session_token in sessions if session_token else False}")
+    return JSONResponse(
+        status_code=401,
+        content={"authenticated": False, "detail": "No valid session"}
+    )
+
+
+# Login page endpoint - now just redirects to OAuth
+@app.get("/login.html")
+async def serve_login():
+    """Redirect to OAuth login flow"""
+    return RedirectResponse(url="/auth/login")
+
 # Serve the React app for admin routes
 @app.get("/admin")
 @app.get("/admin/{path:path}")
-async def serve_admin(path: str = ""):
+async def serve_admin(request: Request, path: str = ""):
     """Serve the React admin app for all /admin routes"""
-    if os.path.exists("dist/index.html"):
-        return FileResponse("dist/index.html")
-    elif os.path.exists("../dist/index.html"):
-        return FileResponse("../dist/index.html")
+    # Check if user is authenticated via session cookie
+    session_token = request.cookies.get("session_token")
+    
+    # If authenticated via OAuth, create a bridge to the React app
+    if session_token and session_token in sessions:
+        # User is authenticated, serve the admin page
+        # The React app will need to call /api/v1/auth/me to get user info
+        if os.path.exists("dist/index.html"):
+            return FileResponse("dist/index.html")
+        elif os.path.exists("../dist/index.html"):
+            return FileResponse("../dist/index.html")
     else:
-        raise HTTPException(status_code=404, detail="Admin interface not found")
+        # Not authenticated, redirect to OAuth login
+        return RedirectResponse(url="/auth/login", status_code=302)
+    
+    raise HTTPException(status_code=404, detail="Admin interface not found")
 
 # Serve the React app for all non-API routes
 @app.get("/{full_path:path}")
-async def serve_spa(full_path: str):
+async def serve_spa(full_path: str, request: Request):
     """Serve the React app for all routes"""
+    # Skip empty path as it's handled by the root redirect
+    if full_path == "":
+        print("Catch-all got empty path, this shouldn't happen")
+        return RedirectResponse(url="/login.html", status_code=302)
+    
     # Check if requesting a static file
     if full_path.startswith("assets/") or full_path.endswith((".js", ".css", ".png", ".jpg", ".svg", ".ico")):
         file_path = os.path.join("dist", full_path)

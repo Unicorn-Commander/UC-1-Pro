@@ -328,6 +328,37 @@ if [ "$INSTALL_STATE" = "stage3" ]; then
         echo -e "${YELLOW}Creating .env file with secure auto-generated passwords...${NC}"
         cp .env.template .env
         
+        # Configure domain/remote access
+        echo ""
+        echo -e "${BLUE}=== Remote Access Configuration ===${NC}"
+        echo "Configure domain for remote access (press Enter for localhost only):"
+        read -p "Domain or IP address (e.g., ai.example.com or 192.168.1.100): " EXTERNAL_HOST
+        
+        if [ -n "$EXTERNAL_HOST" ] && [ "$EXTERNAL_HOST" != "localhost" ]; then
+            # Update EXTERNAL_HOST
+            sed -i.bak "s|EXTERNAL_HOST=.*|EXTERNAL_HOST=${EXTERNAL_HOST}|" .env
+            
+            # Ask about HTTPS
+            echo ""
+            read -p "Will you use HTTPS? (y/N): " -n 1 -r
+            echo
+            if [[ $REPLY =~ ^[Yy]$ ]]; then
+                sed -i.bak "s|EXTERNAL_PROTOCOL=.*|EXTERNAL_PROTOCOL=https|" .env
+                echo -e "${GREEN}✓ Configured for HTTPS access${NC}"
+            else
+                sed -i.bak "s|EXTERNAL_PROTOCOL=.*|EXTERNAL_PROTOCOL=http|" .env
+                echo -e "${GREEN}✓ Configured for HTTP access${NC}"
+            fi
+            
+            echo ""
+            echo -e "${YELLOW}Note: For subdomain access, configure DNS records:${NC}"
+            echo "  A    chat.$EXTERNAL_HOST    -> Your server IP"
+            echo "  A    search.$EXTERNAL_HOST  -> Your server IP"
+            echo ""
+        else
+            echo -e "${GREEN}✓ Configured for localhost access only${NC}"
+        fi
+        
         # Generate secure passwords and keys
         POSTGRES_PASS=$(generate_password 24)
         WEBUI_SECRET=$(generate_password 64)
@@ -431,10 +462,27 @@ with open('.env', 'w') as f:
     echo "2. Start the stack: ${GREEN}./start.sh${NC}"
     echo "3. Monitor logs: ${GREEN}docker-compose logs -f${NC}"
     echo ""
+    # Read configuration from .env
+    if [ -f ".env" ]; then
+        source .env
+    fi
+    
     echo "Services will be available at:"
-    echo "  - Open-WebUI: ${BLUE}http://localhost:8080${NC}"
-    echo "  - vLLM API: ${BLUE}http://localhost:8000${NC}"
-    echo "  - Documentation: ${BLUE}http://localhost:8081${NC}"
+    if [ -n "$EXTERNAL_HOST" ] && [ "$EXTERNAL_HOST" != "localhost" ]; then
+        # Remote access URLs
+        echo "  - Open-WebUI: ${BLUE}${EXTERNAL_PROTOCOL:-http}://chat.${EXTERNAL_HOST}${NC}"
+        echo "  - Center-Deep Search: ${BLUE}${EXTERNAL_PROTOCOL:-http}://search.${EXTERNAL_HOST}${NC}"
+        echo "  - Admin Dashboard: ${BLUE}${EXTERNAL_PROTOCOL:-http}://${EXTERNAL_HOST}:8084${NC}"
+        echo "  - vLLM API: ${BLUE}${EXTERNAL_PROTOCOL:-http}://${EXTERNAL_HOST}:8000${NC}"
+        echo "  - Documentation: ${BLUE}${EXTERNAL_PROTOCOL:-http}://${EXTERNAL_HOST}:8081${NC}"
+    else
+        # Local access URLs
+        echo "  - Open-WebUI: ${BLUE}http://localhost:8080${NC}"
+        echo "  - Center-Deep Search: ${BLUE}http://localhost:8888${NC}"
+        echo "  - Admin Dashboard: ${BLUE}http://localhost:8084${NC}"
+        echo "  - vLLM API: ${BLUE}http://localhost:8000${NC}"
+        echo "  - Documentation: ${BLUE}http://localhost:8081${NC}"
+    fi
     echo ""
     
     # Final GPU check
